@@ -1,4 +1,4 @@
-import { withRetry } from "../lib/retry.js"
+import { withRetry } from "../lib/retry"
 
 export type BaseClientOptions = {
   readonly baseUrl: string

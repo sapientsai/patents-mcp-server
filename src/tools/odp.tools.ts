@@ -1,9 +1,9 @@
 import type { FastMCP } from "fastmcp"
 import { z } from "zod"
 
-import { OdpClient } from "../clients/odp.client.js"
-import { config } from "../lib/config.js"
-import { handleApiError } from "../lib/errors.js"
+import { OdpClient } from "../clients/odp.client"
+import { config } from "../lib/config"
+import { handleApiError } from "../lib/errors"
 
 const ODP_ANNOTATIONS = {
   readOnlyHint: true,

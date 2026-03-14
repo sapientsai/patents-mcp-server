@@ -1,5 +1,5 @@
-import { normalizePatentNumber } from "../lib/patent-number.js"
-import { BaseClient } from "./base.client.js"
+import { normalizePatentNumber } from "../lib/patent-number"
+import { BaseClient } from "./base.client"
 
 export type OdpConfig = {
   readonly apiKey: string

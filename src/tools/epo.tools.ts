@@ -10,8 +10,8 @@ import {
   epoLegalStatus,
   epoNumberConvert,
   epoSearchPatents,
-} from "../clients/epo-ops.client.js"
-import { handleApiError } from "../lib/errors.js"
+} from "../clients/epo-ops.client"
+import { handleApiError } from "../lib/errors"
 
 const numberFormatSchema = z
   .enum(["docdb", "epodoc", "original"])

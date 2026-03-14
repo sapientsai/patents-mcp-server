@@ -1,8 +1,8 @@
 import { XMLParser } from "fast-xml-parser"
 
-import { config } from "../lib/config.js"
-import { withRetry } from "../lib/retry.js"
-import { BaseClient } from "./base.client.js"
+import { config } from "../lib/config"
+import { withRetry } from "../lib/retry"
+import { BaseClient } from "./base.client"
 
 const EPO_AUTH_URL = "https://ops.epo.org/3.2/auth/accesstoken"
 const EPO_BASE_URL = "https://ops.epo.org/3.2/rest-services/"

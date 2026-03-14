@@ -1,6 +1,6 @@
 import { BigQuery } from "@google-cloud/bigquery"
 
-import { config } from "../lib/config.js"
+import { config } from "../lib/config"
 
 const DATASET = "patents-public-data.patents.publications"
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { normalizePatentNumber } from "../src/lib/patent-number.js"
+import { normalizePatentNumber } from "../src/lib/patent-number"
 
 describe("normalizePatentNumber", () => {
   it("handles plain number", () => {

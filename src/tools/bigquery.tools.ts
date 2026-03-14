@@ -6,8 +6,8 @@ import {
   bigqueryCpcAnalytics,
   bigqueryPatentFamily,
   bigqueryPatentSearch,
-} from "../clients/bigquery.client.js"
-import { handleApiError } from "../lib/errors.js"
+} from "../clients/bigquery.client"
+import { handleApiError } from "../lib/errors"
 
 const readOnlyAnnotations = {
   readOnlyHint: true as const,

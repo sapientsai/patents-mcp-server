@@ -1,9 +1,9 @@
 import type { FastMCP } from "fastmcp"
 import { z } from "zod"
 
-import { PatentsViewClient } from "../clients/patentsview.client.js"
-import { config } from "../lib/config.js"
-import { handleApiError } from "../lib/errors.js"
+import { PatentsViewClient } from "../clients/patentsview.client"
+import { config } from "../lib/config"
+import { handleApiError } from "../lib/errors"
 
 const TOOL_ANNOTATIONS = {
   readOnlyHint: true,

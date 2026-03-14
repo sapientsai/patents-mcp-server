@@ -1,4 +1,4 @@
-import { BaseClient } from "./base.client.js"
+import { BaseClient } from "./base.client"
 
 export type PatentsViewClientOptions = {
   readonly baseUrl?: string

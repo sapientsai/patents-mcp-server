@@ -1,13 +1,13 @@
 import type { FastMCP } from "fastmcp"
 
-import { registerBigQueryTools } from "./bigquery.tools.js"
-import { registerCitationsTools } from "./citations.tools.js"
-import { registerEpoTools } from "./epo.tools.js"
-import { registerOdpTools } from "./odp.tools.js"
-import { registerOfficeActionsTools } from "./office-actions.tools.js"
-import { registerPatentsViewTools } from "./patentsview.tools.js"
-import { registerPtabTools } from "./ptab.tools.js"
-import { registerUtilityTools } from "./utility.tools.js"
+import { registerBigQueryTools } from "./bigquery.tools"
+import { registerCitationsTools } from "./citations.tools"
+import { registerEpoTools } from "./epo.tools"
+import { registerOdpTools } from "./odp.tools"
+import { registerOfficeActionsTools } from "./office-actions.tools"
+import { registerPatentsViewTools } from "./patentsview.tools"
+import { registerPtabTools } from "./ptab.tools"
+import { registerUtilityTools } from "./utility.tools"
 
 export const registerAllTools = (server: FastMCP): void => {
   registerPatentsViewTools(server)

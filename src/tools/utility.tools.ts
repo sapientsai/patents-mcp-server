@@ -1,9 +1,9 @@
 import type { FastMCP } from "fastmcp"
 import { z } from "zod"
 
-import { config, getAvailableSources } from "../lib/config.js"
-import { handleApiError } from "../lib/errors.js"
-import type { ApiStatus } from "../lib/types.js"
+import { config, getAvailableSources } from "../lib/config"
+import { handleApiError } from "../lib/errors"
+import type { ApiStatus } from "../lib/types"
 
 const UTILITY_ANNOTATIONS = {
   readOnlyHint: true,

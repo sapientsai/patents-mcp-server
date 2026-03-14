@@ -1,9 +1,16 @@
 {
   "mcpServers": {
-    "openfda": {
+    "patents": {
       "command": "node",
       "args": ["dist/index.js"],
-      "env": {}
+      "env": {
+        "USPTO_API_KEY": "",
+        "PATENTSVIEW_API_KEY": "",
+        "EPO_CONSUMER_KEY": "",
+        "EPO_CONSUMER_SECRET": "",
+        "GOOGLE_APPLICATION_CREDENTIALS": "",
+        "GOOGLE_CLOUD_PROJECT": ""
+      }
     }
   }
 }

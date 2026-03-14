@@ -36,6 +36,9 @@
     "ts-builds": "^2.5.1",
     "tsdown": "^0.21.2"
   },
+  "bin": {
+    "patents-mcp-server": "./dist/index.js"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { config } from "./lib/config.js"
 import { registerPrompts } from "./prompts/index.js"
 import { registerResources } from "./resources/index.js"

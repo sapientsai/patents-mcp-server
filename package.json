@@ -1,12 +1,14 @@
 {
-  "name": "ts-builds-template",
+  "name": "patents-mcp-server",
   "version": "1.0.0",
-  "description": "A basic template for creating a TypeScript Builds and Publishing it to NPM.",
+  "description": "FastMCP TypeScript patent intelligence MCP server for Civala — 55 tools across USPTO, EPO, and BigQuery",
   "keywords": [
-    "typescript",
-    "template",
-    "tsdown",
-    "npm"
+    "mcp",
+    "patents",
+    "fastmcp",
+    "uspto",
+    "epo",
+    "patent-search"
   ],
   "author": "jordan.burke@gmail.com",
   "license": "MIT",
@@ -50,5 +52,12 @@
     "dist"
   ],
   "prettier": "ts-builds/prettier",
-  "packageManager": "pnpm@10.32.1+sha512.a706938f0e89ac1456b6563eab4edf1d1faf3368d1191fc5c59790e96dc918e4456ab2e67d613de1043d2e8c81f87303e6b40d4ffeca9df15ef1ad567348f2be"
+  "packageManager": "pnpm@10.32.1+sha512.a706938f0e89ac1456b6563eab4edf1d1faf3368d1191fc5c59790e96dc918e4456ab2e67d613de1043d2e8c81f87303e6b40d4ffeca9df15ef1ad567348f2be",
+  "dependencies": {
+    "@google-cloud/bigquery": "^8.1.1",
+    "fast-xml-parser": "^5.5.5",
+    "fastmcp": "^3.34.0",
+    "functype": "^0.49.0",
+    "zod": "^4.3.6"
+  }
 }

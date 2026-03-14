@@ -4,93 +4,81 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a TypeScript library template designed to be cloned/forked for creating new npm packages. It uses the `ts-builds` toolchain for standardized build scripts with ESM output.
+FastMCP TypeScript patent intelligence MCP server for Civala. Provides ~55 tools across 5 data sources (PatentsView, USPTO ODP, EPO OPS, BigQuery, PTAB) for competitive IP landscape analysis, freedom-to-operate research, and patent monitoring — primarily for oncology/biotech drug pipeline.
 
-**Template Usage**: See STANDARDIZATION_GUIDE.md for applying this pattern to other TypeScript projects.
+Ported from Python `riemannzeta/patent_mcp_server` (51 tools) with EPO OPS and BigQuery added. PPUBS dependency killed (broken auth, reverse-engineered API).
 
 ## Development Commands
 
-All commands delegate to `ts-builds` for consistency across projects:
-
 ```bash
 pnpm validate        # Main command: format + lint + test + build (use before commits)
-
 pnpm format          # Format code with Prettier
-pnpm format:check    # Check formatting only
-
 pnpm lint            # Fix ESLint issues
-pnpm lint:check      # Check ESLint issues only
-
 pnpm test            # Run tests once
-pnpm test:watch      # Run tests in watch mode
-pnpm test:coverage   # Run tests with coverage
-
 pnpm build           # Production build (outputs to dist/)
-pnpm dev             # Development build with watch mode
-
 pnpm typecheck       # Check TypeScript types
-```
-
-### Running a Single Test
-
-```bash
-pnpm test -- --testNamePattern="pattern"    # Filter by test name
-pnpm test -- test/specific.spec.ts          # Run specific file
 ```
 
 ## Architecture
 
-### Build System: ts-builds + tsdown
+### MCP Server: FastMCP + Zod
 
-- **ts-builds**: Centralized toolchain package providing all build scripts
-- **tsdown**: Underlying bundler configured via `ts-builds/tsdown`
-- **Configuration**: `tsdown.config.ts` imports default config from ts-builds
-- **TypeScript**: `tsconfig.json` extends `ts-builds/tsconfig`
-- **Prettier**: Uses `ts-builds/prettier` shared config
+- **FastMCP** ^3.34.0 — MCP server framework
+- **Zod** ^4 — parameter validation for all tools
+- **Transport**: stdio (default) or httpStream (for deployment)
+- **Tool naming**: kebab-case with source prefix (e.g., `epo-family-lookup`)
 
-### Output Format
+### Project Structure
 
-- **dist/**: Production builds containing:
-  - `index.js` - ES module format
-  - `index.d.ts` - TypeScript declarations
-- **lib/**: Development builds (also published)
-
-### Package Exports
-
-```json
-{
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
-    }
-  }
-}
+```
+src/
+├── index.ts                    # Entry point: register tools, start server
+├── server.ts                   # FastMCP instance
+├── tools/
+│   ├── index.ts                # registerAllTools — wires all tool modules
+│   ├── patentsview.tools.ts    # 14 tools — PatentsView API
+│   ├── odp.tools.ts            # 12 tools — USPTO Open Data Portal
+│   ├── ptab.tools.ts           # 7 tools — PTAB proceedings
+│   ├── citations.tools.ts      # 6 tools — Citations & Litigation
+│   ├── epo.tools.ts            # 8 tools — EPO OPS (international)
+│   ├── bigquery.tools.ts       # 4 tools — Google Patents BigQuery
+│   ├── office-actions.tools.ts # 4 tools — Office Actions
+│   └── utility.tools.ts        # 3 tools — Health check, CPC, status codes
+├── clients/
+│   ├── base.client.ts          # Shared fetch wrapper with retry
+│   ├── patentsview.client.ts   # PatentsView client
+│   ├── odp.client.ts           # USPTO ODP client (incl. PTAB, citations, OA)
+│   ├── epo-ops.client.ts       # EPO OAuth 2.0 + XML parsing
+│   └── bigquery.client.ts      # Google BigQuery client
+├── resources/
+│   └── index.ts                # 4 MCP resources (CPC, status codes, sources, syntax)
+├── prompts/
+│   └── index.ts                # 6 prompt templates (prior art, FTO, landscape, etc.)
+└── lib/
+    ├── config.ts               # Env var loading
+    ├── retry.ts                # Exponential backoff with jitter
+    ├── patent-number.ts        # Patent number normalization
+    ├── types.ts                # Shared types
+    └── errors.ts               # Error handling
 ```
 
-### Testing: Vitest
+### Data Sources
 
-- Tests located in `test/*.spec.ts`
-- Uses Vitest with configuration from ts-builds
-- Coverage via v8 provider
+| Source      | Auth                | Tools    | Key Capability                                |
+| ----------- | ------------------- | -------- | --------------------------------------------- |
+| PatentsView | Optional API key    | 14       | US patent search, disambiguated entities      |
+| USPTO ODP   | API key (x-api-key) | 12+7+6+4 | Applications, PTAB, citations, office actions |
+| EPO OPS     | OAuth 2.0           | 8        | INPADOC families, legal status, claims text   |
+| BigQuery    | GCP service account | 4        | Full-text claims search across 90M+ patents   |
 
-## Key Files
+### Configuration
 
-- `src/index.ts` - Main library entry point
-- `test/*.spec.ts` - Test files
-- `tsdown.config.ts` - Build config (imports from ts-builds)
-- `tsconfig.json` - TypeScript config (extends ts-builds)
-- `.claude/skills/ts-builds-template/` - Claude Code skill for bootstrapping libraries from this template
+See `.env.example` for all environment variables. Missing API keys disable related tools gracefully.
 
-## Publishing
+## Key Design Decisions
 
-```bash
-npm version patch|minor|major
-npm publish --access public
-```
-
-The `prepublishOnly` hook automatically runs `pnpm validate` before publishing.
+- **No PPUBS**: Killed — reverse-engineered, broken auth, EPO/BigQuery cover the need
+- **functype**: Not currently used in codebase (available for future FP patterns)
+- **Native fetch**: Node 22 built-in, no axios dependency
+- **EPO XML**: Parsed with fast-xml-parser, namespace-aware
+- **BigQuery**: Mandatory dryRun before every query, cost reported in responses

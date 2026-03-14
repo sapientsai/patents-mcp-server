@@ -1,6 +1,6 @@
 import { FastMCP } from "fastmcp"
 
 export const server = new FastMCP({
-  name: "civala-patents-mcp",
+  name: "patents-mcp-server",
   version: "1.0.0",
 })

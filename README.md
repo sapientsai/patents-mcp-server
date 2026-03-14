@@ -1,112 +1,191 @@
-## ts-builds-template
+# patents-mcp-server
 
-[![Node.js CI](https://github.com/jordanburke/ts-builds-template/actions/workflows/node.js.yml/badge.svg)](https://github.com/jordanburke/ts-builds-template/actions/workflows/node.js.yml)
-[![npm version](https://img.shields.io/npm/v/ts-builds-template.svg)](https://www.npmjs.com/package/ts-builds-template)
+FastMCP TypeScript patent intelligence MCP server. 55 tools across USPTO, EPO, and Google Patents for IP landscape analysis, freedom-to-operate research, and patent monitoring.
 
-A modern TypeScript library template with standardized build scripts and tooling.
+## Data Sources
 
-## Features
-
-- **Modern Build System**: [ts-builds](https://github.com/jordanburke/ts-builds) + [tsdown](https://tsdown.dev/) for fast bundling
-- **Testing**: [Vitest](https://vitest.dev/) with coverage reporting
-- **Code Quality**: ESLint + Prettier with automatic formatting and fixing
-- **ESM Output**: ES module output with proper TypeScript declarations
-- **Standardized Scripts**: Consistent commands via ts-builds across all projects
+| Source              | Tools | Key Capability                                                                |
+| ------------------- | ----- | ----------------------------------------------------------------------------- |
+| **PatentsView**     | 14    | US patent search, disambiguated entities (assignees, inventors, attorneys)    |
+| **USPTO ODP**       | 29    | Applications, PTAB proceedings, citations, litigation, office actions         |
+| **EPO OPS**         | 8     | INPADOC patent families, legal status across ~44 offices, claims/descriptions |
+| **Google BigQuery** | 4     | Full-text search across 90M+ patents, citation networks, CPC analytics        |
 
 ## Quick Start
 
-1. **Use this template** to create a new repository
-2. **Clone your new repository**
-3. **Install dependencies**: `pnpm install`
-4. **Start developing**: `pnpm dev` (builds with watch mode)
-5. **Before committing**: `pnpm validate` (format + lint + test + build)
-
-## Development Commands
-
-### Pre-Checkin Command
-
 ```bash
-pnpm validate  # Main command: format, lint, test, and build everything
+pnpm install
+cp .env.example .env    # Add your API keys
+pnpm build
 ```
 
-### Individual Commands
+### Run via stdio (Claude Desktop / Claude Code)
 
 ```bash
-# Formatting
-pnpm format        # Format code with Prettier
-pnpm format:check  # Check formatting without writing
-
-# Linting
-pnpm lint          # Fix ESLint issues
-pnpm lint:check    # Check ESLint issues without fixing
-
-# Testing
-pnpm test          # Run tests once
-pnpm test:watch    # Run tests in watch mode
-pnpm test:coverage # Run tests with coverage report
-
-# Building
-pnpm build         # Production build
-pnpm dev           # Development mode with watch
-
-# Type Checking
-pnpm typecheck     # Check TypeScript types
+node dist/index.js
 ```
 
-## Publishing
-
-The template automatically runs `pnpm validate` before publishing via the `prepublishOnly` script.
+### Run via HTTP (remote deployment)
 
 ```bash
-npm version patch|minor|major
-npm publish --access public
+TRANSPORT=httpStream PORT=8080 node dist/index.js
 ```
 
-## Project Structure
+### Test with MCP Inspector
+
+```bash
+npx @modelcontextprotocol/inspector node dist/index.js
+```
+
+## Configuration
+
+Copy `.env.example` and fill in your API keys:
+
+```bash
+# USPTO Open Data Portal (required for ODP, PTAB, litigation, office actions)
+USPTO_API_KEY=
+
+# PatentsView (optional — works without key, key grants suspended March 2026)
+PATENTSVIEW_API_KEY=
+
+# EPO OPS (register at developers.epo.org)
+EPO_CONSUMER_KEY=
+EPO_CONSUMER_SECRET=
+
+# Google BigQuery (requires GCP project with service account)
+GOOGLE_APPLICATION_CREDENTIALS=   # Path to service account JSON
+GOOGLE_CLOUD_PROJECT=             # GCP project ID
+```
+
+Missing API keys disable related tools gracefully — the server still starts with whatever sources are configured. Use the `check-api-status` tool to verify which sources are available.
+
+## Tools
+
+### PatentsView (14 tools)
+
+Search and retrieve US patent data with disambiguated entities.
+
+- `patentsview-search-patents` — Full-text search by text, assignee, or inventor
+- `patentsview-get-patent` — Get patent by ID
+- `patentsview-search-assignees` / `get-assignee` — Disambiguated assignee search
+- `patentsview-search-inventors` / `get-inventor` — Disambiguated inventor search
+- `patentsview-search-attorneys` / `get-attorney` — Attorney search
+- `patentsview-get-claims` — Full claims text
+- `patentsview-get-description` — Patent description
+- `patentsview-search-by-cpc` / `lookup-cpc` — CPC classification search
+- `patentsview-search-by-ipc` / `lookup-ipc` — IPC classification search
+
+### USPTO ODP (12 tools)
+
+Official USPTO Open Data Portal — applications, prosecution history, assignments.
+
+- `odp-search-applications` — Search patent applications (2001+)
+- `odp-get-application` / `metadata` / `continuity` / `assignment` / `adjustment` / `attorney` / `foreign-priority` / `transactions` / `documents`
+- `odp-search-datasets` / `get-dataset` — Bulk data products
+
+### PTAB (7 tools)
+
+Post-grant proceedings — IPR, PGR, CBM, ex parte appeals.
+
+- `ptab-search-proceedings` / `get-proceeding` / `get-documents`
+- `ptab-search-decisions` / `get-decision`
+- `ptab-search-appeals` / `get-appeal`
+
+### Citations & Litigation (6 tools)
+
+Patent citations and litigation data.
+
+- `citations-get-enriched` / `search` / `get-metrics`
+- `litigation-search` / `get-case` / `get-patent`
+
+### EPO OPS (8 tools)
+
+European Patent Office — international coverage, INPADOC families, legal status.
+
+- `epo-search-patents` — CQL search (title, abstract, applicant, inventor, CPC, date)
+- `epo-get-biblio` / `abstract` / `claims` / `description` — Patent document sections
+- `epo-family-lookup` — INPADOC family members across all jurisdictions
+- `epo-legal-status` — Legal status across ~44 patent offices
+- `epo-number-convert` — Convert between number formats
+
+### Google BigQuery (4 tools)
+
+Full-text search across 90M+ patent documents. Replaces PPUBS for claims search.
+
+- `bigquery-patent-search` — Full-text search across titles and abstracts
+- `bigquery-patent-family` — Family members by INPADOC family ID
+- `bigquery-citation-network` — Citation graph (depth 1 or 2)
+- `bigquery-cpc-analytics` — Filing statistics by CPC classification
+
+### Office Actions (4 tools)
+
+USPTO office action data (migrating to ODP in 2026).
+
+- `office-action-get-text` / `search` / `get-citations` / `get-rejections`
+
+### Utility (3 tools)
+
+- `check-api-status` — Health check all configured APIs
+- `get-cpc-info` — CPC classification lookup
+- `get-status-code` — USPTO status code meanings
+
+## Prompts
+
+Six workflow prompt templates for common patent analysis tasks:
+
+| Prompt                 | Purpose                                    |
+| ---------------------- | ------------------------------------------ |
+| `prior_art_search`     | Multi-source prior art search workflow     |
+| `patent_validity`      | Structured validity analysis (102/103/112) |
+| `competitor_portfolio` | Competitor patent portfolio analysis       |
+| `ptab_research`        | PTAB proceedings research (IPR/PGR/CBM)    |
+| `freedom_to_operate`   | FTO analysis methodology                   |
+| `patent_landscape`     | Technology area landscape mapping          |
+
+## Resources
+
+| URI                       | Description                                              |
+| ------------------------- | -------------------------------------------------------- |
+| `patents://cpc/{code}`    | CPC classification info                                  |
+| `patents://status-codes`  | USPTO status code definitions                            |
+| `patents://sources`       | Data source overview                                     |
+| `patents://search-syntax` | Query syntax guide (PatentsView, EPO CQL, ODP, BigQuery) |
+
+## Development
+
+```bash
+pnpm validate        # Format + lint + typecheck + test + build
+pnpm test            # Run tests
+pnpm build           # Production build
+pnpm typecheck       # Type check only
+```
+
+## Architecture
+
+Built with [FastMCP](https://github.com/punkpeye/fastmcp) + [Zod](https://zod.dev/) + [ts-builds](https://github.com/jordanburke/ts-builds).
 
 ```
 src/
-├── index.ts          # Main library entry point
-test/
-├── *.spec.ts         # Test files
-dist/                 # Built output (ES module + types)
+├── index.ts                    # Entry point
+├── server.ts                   # FastMCP instance
+├── tools/                      # 55 tools across 8 modules
+├── clients/                    # API clients (base, PatentsView, ODP, EPO, BigQuery)
+├── resources/                  # 4 MCP resources
+├── prompts/                    # 6 prompt templates
+└── lib/                        # Config, retry, errors, patent number normalization
 ```
 
-## Tooling
+## License
 
-- **Build**: [ts-builds](https://github.com/jordanburke/ts-builds) - Centralized TypeScript toolchain
-- **Bundler**: [tsdown](https://tsdown.dev/) - Fast TypeScript bundler (successor to tsup)
-- **Test**: [Vitest](https://vitest.dev/) - Fast unit test framework
-- **Lint**: [ESLint](https://eslint.org/) with TypeScript support
-- **Format**: [Prettier](https://prettier.io/) with ESLint integration
-- **Package Manager**: [pnpm](https://pnpm.io/) for fast, efficient installs
+MIT
 
-## Claude Code Skill
+## Acknowledgments
 
-This repository includes a Claude Code skill for bootstrapping new TypeScript libraries from this template:
-
-**Location**: `.claude/skills/ts-builds-template/`
-
-**Usage**: When using Claude Code, the skill provides guidance for:
-
-- Cloning and customizing this template for a new library
-- Understanding the project structure and dev workflow
-- Publishing to npm
-
-**Installation** (for use in other projects):
-
-```bash
-# Copy the skill to your Claude Code skills directory
-cp -r .claude/skills/ts-builds-template ~/.claude/skills/
-```
-
-**Related Skills**: For tooling configuration, migration guides, and standardizing existing projects, see the [ts-builds](https://github.com/jordanburke/ts-builds) skill.
-
-**References**:
-
-- [CLAUDE.md](./CLAUDE.md) - Development guidance for this project
-- [.claude/skills/ts-builds-template/](./.claude/skills/ts-builds-template/) - Complete skill documentation
+- [USPTO](https://www.uspto.gov/) - US Patent and Trademark Office
+- [EPO OPS](https://www.epo.org/en/searching-for-patents/data/web-services/ops) - European Patent Office Open Patent Services
+- [PatentsView](https://patentsview.org/) - USPTO patent data platform
+- [Google Patents Public Data](https://console.cloud.google.com/marketplace/product/google_patents_public_datasets/google-patents-public-data) - BigQuery patent dataset
 
 ---
 
-_This template is based on the earlier work of https://github.com/orabazu/tsup-library-template but updated with modern tooling and standardized scripts._
+**Sponsored by <a href="https://sapientsai.com/"><img src="https://sapientsai.com/images/logo.svg" alt="SapientsAI" width="20" style="vertical-align: middle;"> SapientsAI</a>** — Building agentic AI for businesses

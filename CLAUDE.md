@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-FastMCP TypeScript patent intelligence MCP server for Civala. Provides ~55 tools across 5 data sources (PatentsView, USPTO ODP, EPO OPS, BigQuery, PTAB) for competitive IP landscape analysis, freedom-to-operate research, and patent monitoring — primarily for oncology/biotech drug pipeline.
+FastMCP TypeScript patent intelligence MCP server. Provides ~55 tools across 5 data sources (PatentsView, USPTO ODP, EPO OPS, BigQuery, PTAB) for competitive IP landscape analysis, freedom-to-operate research, and patent monitoring.
 
 Ported from Python `riemannzeta/patent_mcp_server` (51 tools) with EPO OPS and BigQuery added. PPUBS dependency killed (broken auth, reverse-engineered API).
 

@@ -1,7 +1,7 @@
 {
   "name": "patents-mcp-server",
   "version": "1.0.0",
-  "description": "FastMCP TypeScript patent intelligence MCP server for Civala — 55 tools across USPTO, EPO, and BigQuery",
+  "description": "FastMCP TypeScript patent intelligence MCP server — 55 tools across USPTO, EPO, and BigQuery",
   "keywords": [
     "mcp",
     "patents",
@@ -12,10 +12,10 @@
   ],
   "author": "jordan.burke@gmail.com",
   "license": "MIT",
-  "homepage": "https://github.com/jordanburke/ts-builds-template",
+  "homepage": "https://github.com/jordanburke/patents-mcp-server",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jordanburke/ts-builds-template"
+    "url": "https://github.com/jordanburke/patents-mcp-server"
   },
   "scripts": {
     "validate": "ts-builds validate",

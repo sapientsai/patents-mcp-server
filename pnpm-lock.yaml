@@ -34,10 +34,10 @@ importers:
         version: 24.12.0
       ts-builds:
         specifier: ^2.5.2
-        version: 2.5.2(@typescript-eslint/eslint-plugin@8.57.0(@typescript-eslint/parser@8.57.0(eslint@10.0.3(jiti@2.6.1))(typescript@5.9.3))(eslint@10.0.3(jiti@2.6.1))(typescript@5.9.3))(@typescript-eslint/parser@8.57.0(eslint@10.0.3(jiti@2.6.1))(typescript@5.9.3))(eslint-config-prettier@10.1.8(eslint@10.0.3(jiti@2.6.1)))(jiti@2.6.1)(tsdown@0.21.2(synckit@0.11.12)(typescript@5.9.3))(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1))
+        version: 2.5.2(@typescript-eslint/eslint-plugin@8.57.0(@typescript-eslint/parser@8.57.0(eslint@10.0.3(jiti@2.6.1))(typescript@5.9.3))(eslint@10.0.3(jiti@2.6.1))(typescript@5.9.3))(@typescript-eslint/parser@8.57.0(eslint@10.0.3(jiti@2.6.1))(typescript@5.9.3))(eslint-config-prettier@10.1.8(eslint@10.0.3(jiti@2.6.1)))(jiti@2.6.1)(tsdown@0.21.3(synckit@0.11.12)(typescript@5.9.3))(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1))
       tsdown:
-        specifier: ^0.21.2
-        version: 0.21.2(synckit@0.11.12)(typescript@5.9.3)
+        specifier: ^0.21.3
+        version: 0.21.3(synckit@0.11.12)(typescript@5.9.3)
 
 packages:
   "@babel/generator@8.0.0-rc.2":
@@ -1944,9 +1944,9 @@ packages:
       { integrity: sha512-VJCEvtrezO1IAR+kqEYnxUOoStaQPGrCmX3j4wDTNOcD1uRPFpGlwQUIW8niPuvHXaTUxeOUl5MMDGrl+tmO9A== }
     engines: { node: ">=16.9.0" }
 
-  hookable@6.0.1:
+  hookable@6.1.0:
     resolution:
-      { integrity: sha512-uKGyY8BuzN/a5gvzvA+3FVWo0+wUjgtfSdnmjtrOVwQCZPHpHDH2WRO3VZSOeluYrHoDCiXFffZXs8Dj1ULWtw== }
+      { integrity: sha512-ZoKZSJgu8voGK2geJS+6YtYjvIzu9AOM/KZXsBxr83uhLL++e9pEv/dlgwgy3dvHg06kTz6JOh1hk3C8Ceiymw== }
 
   html-entities@2.6.0:
     resolution:
@@ -2914,15 +2914,15 @@ packages:
       "@swc/wasm":
         optional: true
 
-  tsdown@0.21.2:
+  tsdown@0.21.3:
     resolution:
-      { integrity: sha512-pP8eAcd1XAWjl5gjosuJs0BAuVoheUe3V8VDHx31QK7YOgXjcCMsBSyFWO3CMh/CSUkjRUzR96JtGH3WJFTExQ== }
+      { integrity: sha512-oKKeMC8+IgNsB+81hvF5VBsqhqL/nr0g9vse+ujbK40vv0i3ReFI6gUts7hQH7J53ylQNjMgf2Vu6n0+P/uddA== }
     engines: { node: ">=20.19.0" }
     hasBin: true
     peerDependencies:
       "@arethetypeswrong/core": ^0.18.1
-      "@tsdown/css": 0.21.2
-      "@tsdown/exe": 0.21.2
+      "@tsdown/css": 0.21.3
+      "@tsdown/exe": 0.21.3
       "@vitejs/devtools": "*"
       publint: ^0.3.0
       typescript: ^5.0.0
@@ -4731,7 +4731,7 @@ snapshots:
 
   hono@4.12.8: {}
 
-  hookable@6.0.1: {}
+  hookable@6.1.0: {}
 
   html-entities@2.6.0: {}
 
@@ -5502,7 +5502,7 @@ snapshots:
     dependencies:
       typescript: 5.9.3
 
-  ts-builds@2.5.2(@typescript-eslint/eslint-plugin@8.57.0(@typescript-eslint/parser@8.57.0(eslint@10.0.3(jiti@2.6.1))(typescript@5.9.3))(eslint@10.0.3(jiti@2.6.1))(typescript@5.9.3))(@typescript-eslint/parser@8.57.0(eslint@10.0.3(jiti@2.6.1))(typescript@5.9.3))(eslint-config-prettier@10.1.8(eslint@10.0.3(jiti@2.6.1)))(jiti@2.6.1)(tsdown@0.21.2(synckit@0.11.12)(typescript@5.9.3))(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)):
+  ts-builds@2.5.2(@typescript-eslint/eslint-plugin@8.57.0(@typescript-eslint/parser@8.57.0(eslint@10.0.3(jiti@2.6.1))(typescript@5.9.3))(eslint@10.0.3(jiti@2.6.1))(typescript@5.9.3))(@typescript-eslint/parser@8.57.0(eslint@10.0.3(jiti@2.6.1))(typescript@5.9.3))(eslint-config-prettier@10.1.8(eslint@10.0.3(jiti@2.6.1)))(jiti@2.6.1)(tsdown@0.21.3(synckit@0.11.12)(typescript@5.9.3))(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)):
     dependencies:
       "@eslint/js": 10.0.1(eslint@10.0.3(jiti@2.6.1))
       "@types/node": 24.10.15
@@ -5523,7 +5523,7 @@ snapshots:
       typescript-eslint: 8.57.0(eslint@10.0.3(jiti@2.6.1))(typescript@5.9.3)
       vitest: 4.1.0(@types/node@24.12.0)(@vitest/ui@4.1.0)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1))
     optionalDependencies:
-      tsdown: 0.21.2(synckit@0.11.12)(typescript@5.9.3)
+      tsdown: 0.21.3(synckit@0.11.12)(typescript@5.9.3)
       vite: 7.3.1(@types/node@24.12.0)(jiti@2.6.1)
     transitivePeerDependencies:
       - "@edge-runtime/vm"
@@ -5567,13 +5567,13 @@ snapshots:
       v8-compile-cache-lib: 3.0.1
       yn: 3.1.1
 
-  tsdown@0.21.2(synckit@0.11.12)(typescript@5.9.3):
+  tsdown@0.21.3(synckit@0.11.12)(typescript@5.9.3):
     dependencies:
       ansis: 4.2.0
       cac: 7.0.0
       defu: 6.1.4
       empathic: 2.0.0
-      hookable: 6.0.1
+      hookable: 6.1.0
       import-without-cache: 0.2.5
       obug: 2.1.1
       picomatch: 4.0.3

@@ -2,28 +2,32 @@
 FROM node:22-alpine AS builder
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
 WORKDIR /app
 
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
 
-# Install all dependencies (including dev dependencies for build)
+# Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Copy source and config files
-COPY tsconfig.json tsdown.config.ts ts-builds.config.json ./
-COPY src/ ./src/
+# Copy source code
+COPY . .
 
-# Build the application using tsdown directly with dist output
-RUN pnpm exec tsdown --outDir dist
+# Build the application (skip DTS for Docker)
+ENV SKIP_DTS=true
+RUN pnpm build
 
 # Production stage
-FROM node:22-alpine AS production
+FROM node:22-alpine
 
-# Install pnpm for production install
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
 
 WORKDIR /app
 
@@ -33,15 +37,18 @@ COPY package.json pnpm-lock.yaml ./
 # Install production dependencies only
 RUN pnpm install --frozen-lockfile --prod
 
-# Copy built files from builder
-COPY --from=builder /app/dist ./dist
+# Copy built application from builder stage
+COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 
-# Set environment variables
-ENV NODE_ENV=production
+# Switch to non-root user
+USER nodejs
 
-# Expose port for HTTP mode
+# Default to HTTP mode for Docker
+ENV TRANSPORT=httpStream
+ENV PORT=3000
+
+# Expose port for HTTP server
 EXPOSE 3000
 
-# Default command runs in HTTP mode
-ENTRYPOINT ["node", "dist/index.js"]
-CMD ["--transport", "http", "--port", "3000"]
+# Run the MCP server
+CMD ["node", "dist/index.js"]

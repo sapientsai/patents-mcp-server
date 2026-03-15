@@ -8,6 +8,8 @@ services:
     ports:
       - "3000:3000"
     environment:
+      - TRANSPORT=httpStream
+      - PORT=3000
       - USPTO_API_KEY=${USPTO_API_KEY:-}
       - PATENTSVIEW_API_KEY=${PATENTSVIEW_API_KEY:-}
       - EPO_CONSUMER_KEY=${EPO_CONSUMER_KEY:-}

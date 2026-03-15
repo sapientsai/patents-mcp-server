@@ -15,8 +15,8 @@ RUN pnpm install --frozen-lockfile
 # Copy source
 COPY . .
 
-# Build
-RUN pnpm build
+# Build (use tsdown directly — ts-builds wrapper needs rimraf in PATH)
+RUN rm -rf dist && pnpm exec tsdown --outDir dist
 
 # Production stage
 FROM node:22-alpine AS production

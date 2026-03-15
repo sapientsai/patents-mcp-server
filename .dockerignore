@@ -30,7 +30,6 @@ coverage/
 *.spec.ts
 
 # Config files not needed in container
-.npmrc
 .nvmrc
 .prettierignore
 eslint.config.mjs

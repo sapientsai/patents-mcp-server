@@ -1,3 +1,5 @@
+import { expandPath } from "functype-os"
+
 import type { ApiStatus, LogLevel, TransportType } from "./types"
 
 type AppConfig = {
@@ -19,6 +21,13 @@ type AppConfig = {
 const envOrUndefined = (key: string): string | undefined => {
   const value = process.env[key]
   return value !== undefined && value !== "" ? value : undefined
+}
+
+const envPathOrUndefined = (key: string): string | undefined => {
+  const value = envOrUndefined(key)
+  if (!value) return undefined
+  const result = expandPath(value)
+  return result.isRight() ? result.value : value
 }
 
 const envOrDefault = (key: string, defaultValue: string): string => process.env[key] ?? defaultValue
@@ -48,7 +57,7 @@ export const loadConfig = (): AppConfig => ({
   patentsViewApiKey: envOrUndefined("PATENTSVIEW_API_KEY"),
   epoConsumerKey: envOrUndefined("EPO_CONSUMER_KEY"),
   epoConsumerSecret: envOrUndefined("EPO_CONSUMER_SECRET"),
-  googleApplicationCredentials: envOrUndefined("GOOGLE_APPLICATION_CREDENTIALS"),
+  googleApplicationCredentials: envPathOrUndefined("GOOGLE_APPLICATION_CREDENTIALS"),
   googleCloudProject: envOrUndefined("GOOGLE_CLOUD_PROJECT"),
   transport: parseTransport(envOrDefault("TRANSPORT", "stdio")),
   port: envIntOrDefault("PORT", 8080),

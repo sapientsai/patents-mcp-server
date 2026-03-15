@@ -14,6 +14,7 @@ type BigQueryResult = {
 const getBigQueryClient = (): BigQuery => {
   return new BigQuery({
     projectId: config.googleCloudProject,
+    keyFilename: config.googleApplicationCredentials,
   })
 }
 
@@ -69,8 +70,8 @@ export const bigqueryPatentSearch = async (
   const sql = `
     SELECT ${selectedFields}
     FROM \`${DATASET}\`
-    WHERE SEARCH(abstract_localized.text, @query)
-       OR SEARCH(title_localized.text, @query)
+    WHERE EXISTS (SELECT 1 FROM UNNEST(abstract_localized) a WHERE SEARCH(a.text, @query))
+       OR EXISTS (SELECT 1 FROM UNNEST(title_localized) t WHERE SEARCH(t.text, @query))
     ORDER BY publication_date DESC
     LIMIT @limit
   `

@@ -19,6 +19,9 @@ importers:
       functype:
         specifier: ^0.49.0
         version: 0.49.0
+      functype-os:
+        specifier: ^0.3.0
+        version: 0.3.0(functype@0.49.0)
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -1813,6 +1816,13 @@ packages:
   function-bind@1.1.2:
     resolution:
       { integrity: sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA== }
+
+  functype-os@0.3.0:
+    resolution:
+      { integrity: sha512-H6lXr+uvqko67bIs9BzVCVIznxZguHRw1BvT28RHaT1obfz25UXlKhgsbSNlb59pFCszuQDGJg9HXXB3IPIyhg== }
+    engines: { node: ">=18.0.0" }
+    peerDependencies:
+      functype: ">=0.49.0"
 
   functype@0.49.0:
     resolution:
@@ -4603,6 +4613,10 @@ snapshots:
     optional: true
 
   function-bind@1.1.2: {}
+
+  functype-os@0.3.0(functype@0.49.0):
+    dependencies:
+      functype: 0.49.0
 
   functype@0.49.0: {}
 

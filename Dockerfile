@@ -15,9 +15,8 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
-# Build the application (skip DTS for Docker)
-ENV SKIP_DTS=true
-RUN pnpm build
+# Build the application using tsdown directly (skip ts-builds wrapper)
+RUN pnpm exec tsdown --outDir dist
 
 # Production stage
 FROM node:22-alpine

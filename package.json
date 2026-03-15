@@ -1,6 +1,6 @@
 {
   "name": "patents-mcp-server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "FastMCP TypeScript patent intelligence MCP server — 55 tools across USPTO, EPO, and BigQuery",
   "keywords": [
     "mcp",

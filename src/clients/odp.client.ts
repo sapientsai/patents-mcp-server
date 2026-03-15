@@ -27,7 +27,7 @@ export class OdpClient {
     this.client = new BaseClient({
       baseUrl: cfg.baseUrl ?? "https://api.uspto.gov/api/v1/",
       headers: {
-        "x-api-key": cfg.apiKey,
+        "X-API-KEY": cfg.apiKey,
       },
       timeout: cfg.timeout,
     })

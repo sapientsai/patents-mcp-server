@@ -31,13 +31,12 @@ export const registerPatentsViewTools = (server: FastMCP): void => {
         .default("text")
         .describe("Type of search: text (abstract search), assignee (organization), or inventor (name)"),
       limit: z.number().int().min(1).max(100).default(25).describe("Number of results to return (1-100)"),
-      offset: z.number().int().min(0).default(0).describe("Offset for pagination"),
     }),
     annotations: TOOL_ANNOTATIONS,
     execute: async (args) => {
       try {
         const client = createClient()
-        const result = await client.searchPatents(args.query, args.search_type, args.limit, args.offset)
+        const result = await client.searchPatents(args.query, args.search_type, args.limit)
         return JSON.stringify(result)
       } catch (error) {
         return handleApiError(error)

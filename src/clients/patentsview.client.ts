@@ -1,4 +1,20 @@
+import type { z, ZodType } from "zod"
+
+import {
+  zAssigneeSuccessResponse,
+  zAttorneySuccessResponse,
+  zCpcSubclassSuccessResponse,
+  zGClaimSuccessResponse,
+  zInventorSuccessResponse,
+  zIpcClassificationSuccessResponse,
+  zPatentSuccessResponse,
+} from "../generated/patentsview/zod.gen"
 import { BaseClient } from "./base.client"
+
+const looseParse = <T extends ZodType>(schema: T, data: unknown): z.infer<T> => {
+  const result = schema.safeParse(data)
+  return result.success ? result.data : (data as z.infer<T>)
+}
 
 export type PatentsViewClientOptions = {
   readonly baseUrl?: string
@@ -6,12 +22,13 @@ export type PatentsViewClientOptions = {
   readonly timeout?: number
 }
 
-type PatentsViewQuery = {
-  readonly q?: Record<string, unknown>
-  readonly f?: ReadonlyArray<string>
-  readonly s?: ReadonlyArray<Record<string, string>>
-  readonly o?: Record<string, unknown>
-}
+export type PatentResponse = z.infer<typeof zPatentSuccessResponse>
+export type AssigneeResponse = z.infer<typeof zAssigneeSuccessResponse>
+export type InventorResponse = z.infer<typeof zInventorSuccessResponse>
+export type AttorneyResponse = z.infer<typeof zAttorneySuccessResponse>
+export type ClaimResponse = z.infer<typeof zGClaimSuccessResponse>
+export type CpcSubclassResponse = z.infer<typeof zCpcSubclassSuccessResponse>
+export type IpcResponse = z.infer<typeof zIpcClassificationSuccessResponse>
 
 const DEFAULT_PATENT_FIELDS = [
   "patent_id",
@@ -19,39 +36,20 @@ const DEFAULT_PATENT_FIELDS = [
   "patent_abstract",
   "patent_date",
   "patent_type",
-  "patent_kind",
-  "patent_num_claims",
   "assignees",
   "inventors",
 ] as const
 
-const CLAIMS_FIELDS = ["patent_id", "patent_title", "claims"] as const
-
-const DESCRIPTION_FIELDS = ["patent_id", "patent_title", "brf_sum_text", "detail_desc_text", "draw_desc_text"] as const
-
-const DEFAULT_ASSIGNEE_FIELDS = [
-  "assignee_id",
-  "assignee_organization",
-  "assignee_first_name",
-  "assignee_last_name",
-  "assignee_type",
-  "assignee_total_num_patents",
-] as const
-
-const DEFAULT_INVENTOR_FIELDS = [
-  "inventor_id",
-  "inventor_first_name",
-  "inventor_last_name",
-  "inventor_total_num_patents",
-] as const
-
-const DEFAULT_ATTORNEY_FIELDS = [
-  "lawyer_id",
-  "lawyer_first_name",
-  "lawyer_last_name",
-  "lawyer_organization",
-  "lawyer_total_num_patents",
-] as const
+const buildParams = (
+  q: Record<string, unknown>,
+  f?: ReadonlyArray<string>,
+  o?: Record<string, unknown>,
+): Record<string, string> => {
+  const params: Record<string, string> = { q: JSON.stringify(q) }
+  if (f) params.f = JSON.stringify(f)
+  if (o) params.o = JSON.stringify(o)
+  return params
+}
 
 export class PatentsViewClient {
   private readonly client: BaseClient
@@ -74,108 +72,93 @@ export class PatentsViewClient {
     query: string,
     searchType: "text" | "assignee" | "inventor" = "text",
     limit = 25,
-    offset = 0,
-  ): Promise<unknown> {
+  ): Promise<PatentResponse> {
     const q = this.buildPatentQuery(query, searchType)
-    const body: PatentsViewQuery = {
-      q,
-      f: [...DEFAULT_PATENT_FIELDS],
-      o: { size: limit, offset },
+    const params = buildParams(q, [...DEFAULT_PATENT_FIELDS], { size: limit })
+    const raw = await this.client.get<unknown>("patent/", params)
+    return looseParse(zPatentSuccessResponse, raw)
+  }
+
+  async getPatent(patentId: string): Promise<PatentResponse> {
+    const raw = await this.client.get<unknown>(`patent/${patentId}/`)
+    return looseParse(zPatentSuccessResponse, raw)
+  }
+
+  async searchAssignees(name: string, limit = 25): Promise<AssigneeResponse> {
+    const params = buildParams({ _text_any: { assignee_organization: name } }, undefined, { size: limit })
+    const raw = await this.client.get<unknown>("assignee/", params)
+    return looseParse(zAssigneeSuccessResponse, raw)
+  }
+
+  async getAssignee(id: string): Promise<AssigneeResponse> {
+    const raw = await this.client.get<unknown>(`assignee/${id}/`)
+    return looseParse(zAssigneeSuccessResponse, raw)
+  }
+
+  async searchInventors(name: string, limit = 25): Promise<InventorResponse> {
+    const q = {
+      _or: [{ _text_any: { inventor_name_first: name } }, { _text_any: { inventor_name_last: name } }],
     }
-    return this.client.post<unknown>("patents/", body)
+    const params = buildParams(q, undefined, { size: limit })
+    const raw = await this.client.get<unknown>("inventor/", params)
+    return looseParse(zInventorSuccessResponse, raw)
   }
 
-  async getPatent(patentId: string): Promise<unknown> {
-    return this.client.get<unknown>(`patents/${patentId}/`)
+  async getInventor(id: string): Promise<InventorResponse> {
+    const raw = await this.client.get<unknown>(`inventor/${id}/`)
+    return looseParse(zInventorSuccessResponse, raw)
   }
 
-  async searchAssignees(name: string, limit = 25): Promise<unknown> {
+  async searchAttorneys(name: string, limit = 25): Promise<AttorneyResponse> {
+    const q = {
+      _or: [{ _text_any: { attorney_organization: name } }, { _text_any: { attorney_name_last: name } }],
+    }
+    const params = buildParams(q, undefined, { size: limit })
+    const raw = await this.client.get<unknown>("patent/attorney/", params)
+    return looseParse(zAttorneySuccessResponse, raw)
+  }
+
+  async getAttorney(id: string): Promise<AttorneyResponse> {
+    const raw = await this.client.get<unknown>(`patent/attorney/${id}/`)
+    return looseParse(zAttorneySuccessResponse, raw)
+  }
+
+  async getClaims(patentId: string): Promise<ClaimResponse> {
+    const params = buildParams({ _eq: { patent_id: patentId } })
+    const raw = await this.client.get<unknown>("g_claim/", params)
+    return looseParse(zGClaimSuccessResponse, raw)
+  }
+
+  async getDescription(patentId: string): Promise<PatentResponse> {
     const params: Record<string, string> = {
-      q: JSON.stringify({ _text_any: { assignee_organization: name } }),
-      f: JSON.stringify([...DEFAULT_ASSIGNEE_FIELDS]),
-      o: JSON.stringify({ size: limit }),
+      f: JSON.stringify(["patent_id", "patent_title", "patent_abstract"]),
     }
-    return this.client.get<unknown>("assignees/", params)
+    const raw = await this.client.get<unknown>(`patent/${patentId}/`, params)
+    return looseParse(zPatentSuccessResponse, raw)
   }
 
-  async getAssignee(id: string): Promise<unknown> {
-    return this.client.get<unknown>(`assignees/${id}/`)
+  async searchByCpc(cpcCode: string, limit = 25): Promise<PatentResponse> {
+    const params = buildParams({ _eq: { cpc_subgroup_id: cpcCode } }, [...DEFAULT_PATENT_FIELDS], { size: limit })
+    const raw = await this.client.get<unknown>("patent/", params)
+    return looseParse(zPatentSuccessResponse, raw)
   }
 
-  async searchInventors(name: string, limit = 25): Promise<unknown> {
-    const params: Record<string, string> = {
-      q: JSON.stringify({
-        _or: [{ _text_any: { inventor_first_name: name } }, { _text_any: { inventor_last_name: name } }],
-      }),
-      f: JSON.stringify([...DEFAULT_INVENTOR_FIELDS]),
-      o: JSON.stringify({ size: limit }),
-    }
-    return this.client.get<unknown>("inventors/", params)
+  async lookupCpc(cpcCode: string): Promise<CpcSubclassResponse> {
+    const params = buildParams({ _eq: { cpc_subclass_id: cpcCode } })
+    const raw = await this.client.get<unknown>("cpc_subclass/", params)
+    return looseParse(zCpcSubclassSuccessResponse, raw)
   }
 
-  async getInventor(id: string): Promise<unknown> {
-    return this.client.get<unknown>(`inventors/${id}/`)
+  async searchByIpc(ipcCode: string, limit = 25): Promise<PatentResponse> {
+    const params = buildParams({ _eq: { ipc_class: ipcCode } }, [...DEFAULT_PATENT_FIELDS], { size: limit })
+    const raw = await this.client.get<unknown>("patent/", params)
+    return looseParse(zPatentSuccessResponse, raw)
   }
 
-  async searchAttorneys(name: string, limit = 25): Promise<unknown> {
-    const params: Record<string, string> = {
-      q: JSON.stringify({
-        _or: [{ _text_any: { lawyer_organization: name } }, { _text_any: { lawyer_last_name: name } }],
-      }),
-      f: JSON.stringify([...DEFAULT_ATTORNEY_FIELDS]),
-      o: JSON.stringify({ size: limit }),
-    }
-    return this.client.get<unknown>("attorneys/", params)
-  }
-
-  async getAttorney(id: string): Promise<unknown> {
-    return this.client.get<unknown>(`attorneys/${id}/`)
-  }
-
-  async getClaims(patentId: string): Promise<unknown> {
-    const params: Record<string, string> = {
-      f: JSON.stringify([...CLAIMS_FIELDS]),
-    }
-    return this.client.get<unknown>(`patents/${patentId}/`, params)
-  }
-
-  async getDescription(patentId: string): Promise<unknown> {
-    const params: Record<string, string> = {
-      f: JSON.stringify([...DESCRIPTION_FIELDS]),
-    }
-    return this.client.get<unknown>(`patents/${patentId}/`, params)
-  }
-
-  async searchByCpc(cpcCode: string, limit = 25): Promise<unknown> {
-    const body: PatentsViewQuery = {
-      q: { _eq: { cpc_subgroup_id: cpcCode } },
-      f: [...DEFAULT_PATENT_FIELDS],
-      o: { size: limit },
-    }
-    return this.client.post<unknown>("patents/", body)
-  }
-
-  async lookupCpc(cpcCode: string): Promise<unknown> {
-    const params: Record<string, string> = {
-      q: JSON.stringify({ _eq: { cpc_subgroup_id: cpcCode } }),
-    }
-    return this.client.get<unknown>("cpc_subgroups/", params)
-  }
-
-  async searchByIpc(ipcCode: string, limit = 25): Promise<unknown> {
-    const body: PatentsViewQuery = {
-      q: { _eq: { ipc_class: ipcCode } },
-      f: [...DEFAULT_PATENT_FIELDS],
-      o: { size: limit },
-    }
-    return this.client.post<unknown>("patents/", body)
-  }
-
-  async lookupIpc(ipcCode: string): Promise<unknown> {
-    const params: Record<string, string> = {
-      q: JSON.stringify({ _eq: { ipc_class: ipcCode } }),
-    }
-    return this.client.get<unknown>("ipc/", params)
+  async lookupIpc(ipcCode: string): Promise<IpcResponse> {
+    const params = buildParams({ _eq: { ipc_class: ipcCode } })
+    const raw = await this.client.get<unknown>("ipc/", params)
+    return looseParse(zIpcClassificationSuccessResponse, raw)
   }
 
   private buildPatentQuery(query: string, searchType: "text" | "assignee" | "inventor"): Record<string, unknown> {
@@ -186,7 +169,7 @@ export class PatentsViewClient {
         return { _text_any: { assignee_organization: query } }
       case "inventor":
         return {
-          _or: [{ _text_any: { inventor_first_name: query } }, { _text_any: { inventor_last_name: query } }],
+          _or: [{ _text_any: { inventor_name_first: query } }, { _text_any: { inventor_name_last: query } }],
         }
     }
   }

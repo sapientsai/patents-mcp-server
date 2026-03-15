@@ -29,9 +29,12 @@
     "test:coverage": "ts-builds test:coverage",
     "build": "ts-builds build",
     "dev": "ts-builds dev",
+    "codegen": "openapi-ts",
+    "fetch-specs": "curl -s https://search.patentsview.org/static/openapi.json > src/specs/patentsview.json && gh api repos/patent-dev/uspto-odp/contents/swagger_fixed.yaml --jq '.content' | base64 -d > src/specs/uspto-odp.yaml",
     "prepublishOnly": "pnpm validate"
   },
   "devDependencies": {
+    "@hey-api/openapi-ts": "^0.94.1",
     "@types/node": "^24.12.0",
     "ts-builds": "^2.5.1",
     "tsdown": "^0.21.2"

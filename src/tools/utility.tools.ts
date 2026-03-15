@@ -134,15 +134,15 @@ export const registerUtilityTools = (server: FastMCP): void => {
           configured: pvSource?.configured ?? false,
           healthy: false,
         }
-        if (pvStatus.configured) {
+        {
+          const apiKey = config.patentsViewApiKey
           const healthResult = await checkApiHealth(
             "PatentsView",
-            'https://search.patentsview.org/api/v1/patent/?q={}&f=["patent_number"]&o={"per_page":1}',
+            "https://search.patentsview.org/api/v1/patent/?q=%7B%7D&f=%5B%22patent_id%22%5D&o=%7B%22size%22%3A1%7D",
+            apiKey ? { "X-Api-Key": apiKey } : undefined,
           )
           pvStatus.healthy = healthResult.healthy
           pvStatus.error = healthResult.error
-        } else {
-          pvStatus.error = "PATENTSVIEW_API_KEY not set"
         }
         statuses.push(pvStatus)
 
@@ -157,8 +157,8 @@ export const registerUtilityTools = (server: FastMCP): void => {
           const apiKey = config.usptoApiKey
           const healthResult = await checkApiHealth(
             "ODP",
-            "https://api.uspto.gov/api/v1/patent/applications?searchText=test&limit=1",
-            apiKey ? { "x-api-key": apiKey } : undefined,
+            "https://api.uspto.gov/api/v1/patent/applications/14412875",
+            apiKey ? { "X-API-KEY": apiKey } : undefined,
           )
           odpStatus.healthy = healthResult.healthy
           odpStatus.error = healthResult.error

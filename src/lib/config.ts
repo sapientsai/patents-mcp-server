@@ -67,7 +67,7 @@ export const getAvailableSources = (cfg: AppConfig): ApiStatus[] => [
   },
   {
     name: "PatentsView",
-    configured: true, // Works without API key
+    configured: cfg.patentsViewApiKey !== undefined,
     healthy: false,
   },
   {

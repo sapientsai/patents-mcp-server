@@ -1,0 +1,25 @@
+services:
+  patents-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: patents-mcp-server:latest
+    container_name: patents-mcp
+    ports:
+      - "3000:3000"
+    environment:
+      - USPTO_API_KEY=${USPTO_API_KEY:-}
+      - PATENTSVIEW_API_KEY=${PATENTSVIEW_API_KEY:-}
+      - EPO_CONSUMER_KEY=${EPO_CONSUMER_KEY:-}
+      - EPO_CONSUMER_SECRET=${EPO_CONSUMER_SECRET:-}
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-key.json
+    volumes:
+      - ${GOOGLE_APPLICATION_CREDENTIALS:-/dev/null}:/app/gcp-key.json:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/mcp').catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

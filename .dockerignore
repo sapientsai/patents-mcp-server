@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+lib/
+
+# IDE and editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Claude
+.claude/
+.claude-plugin/
+CLAUDE.md
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+test/
+coverage/
+*.spec.ts
+
+# Config files not needed in container
+.npmrc
+.nvmrc
+.prettierignore
+eslint.config.mjs
+vitest.config.ts
+openapi-ts.config.ts
+
+# Generated specs (already baked into src/generated/)
+src/specs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local env files
+.env
+.env.*
+.mcp.json

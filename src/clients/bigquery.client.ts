@@ -76,8 +76,8 @@ export const bigqueryPatentSearch = async (
   const sql = `
     SELECT ${selectedFields}
     FROM \`${DATASET}\`
-    WHERE EXISTS (SELECT 1 FROM UNNEST(abstract_localized) a WHERE SEARCH(a.text, @query))
-       OR EXISTS (SELECT 1 FROM UNNEST(title_localized) t WHERE SEARCH(t.text, @query))
+    WHERE EXISTS (SELECT 1 FROM UNNEST(abstract_localized) a WHERE CONTAINS_SUBSTR(a.text, @query))
+       OR EXISTS (SELECT 1 FROM UNNEST(title_localized) t WHERE CONTAINS_SUBSTR(t.text, @query))
     ORDER BY publication_date DESC
     LIMIT @limit
   `

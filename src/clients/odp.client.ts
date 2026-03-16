@@ -37,8 +37,12 @@ export class OdpClient {
 
   async searchApplications(query: string, limit?: number, offset?: number, sort?: string): Promise<unknown> {
     const body: Record<string, unknown> = { q: query }
-    if (limit !== undefined) body.rows = limit
-    if (offset !== undefined) body.start = offset
+    if (limit !== undefined || offset !== undefined) {
+      body.pagination = {
+        ...(offset !== undefined ? { offset } : {}),
+        ...(limit !== undefined ? { limit } : {}),
+      }
+    }
     if (sort !== undefined) body.sort = sort
     return this.client.post("patent/applications/search", body)
   }

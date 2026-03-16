@@ -71,9 +71,10 @@ export class PatentsViewClient {
   async searchPatents(
     query: string,
     searchType: "text" | "assignee" | "inventor" = "text",
+    matchType: "all" | "any" | "phrase" = "all",
     limit = 25,
   ): Promise<PatentResponse> {
-    const q = this.buildPatentQuery(query, searchType)
+    const q = this.buildPatentQuery(query, searchType, matchType)
     const params = buildParams(q, [...DEFAULT_PATENT_FIELDS], { size: limit })
     const raw = await this.client.get<unknown>("patent/", params)
     return looseParse(zPatentSuccessResponse, raw)
@@ -161,15 +162,20 @@ export class PatentsViewClient {
     return looseParse(zIpcClassificationSuccessResponse, raw)
   }
 
-  private buildPatentQuery(query: string, searchType: "text" | "assignee" | "inventor"): Record<string, unknown> {
+  private buildPatentQuery(
+    query: string,
+    searchType: "text" | "assignee" | "inventor",
+    matchType: "all" | "any" | "phrase" = "all",
+  ): Record<string, unknown> {
+    const op = matchType === "phrase" ? "_text_phrase" : matchType === "any" ? "_text_any" : "_text_all"
     switch (searchType) {
       case "text":
-        return { _text_any: { patent_abstract: query } }
+        return { [op]: { patent_abstract: query } }
       case "assignee":
-        return { _text_any: { assignee_organization: query } }
+        return { [op]: { assignee_organization: query } }
       case "inventor":
         return {
-          _or: [{ _text_any: { inventor_name_first: query } }, { _text_any: { inventor_name_last: query } }],
+          _or: [{ [op]: { inventor_name_first: query } }, { [op]: { inventor_name_last: query } }],
         }
     }
   }

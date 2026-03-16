@@ -30,13 +30,19 @@ export const registerPatentsViewTools = (server: FastMCP): void => {
         .enum(["text", "assignee", "inventor"])
         .default("text")
         .describe("Type of search: text (abstract search), assignee (organization), or inventor (name)"),
+      match_type: z
+        .enum(["all", "any", "phrase"])
+        .default("all")
+        .describe(
+          "How to match the query: all (all words must appear, default), any (any word matches), phrase (exact phrase match)",
+        ),
       limit: z.number().int().min(1).max(100).default(25).describe("Number of results to return (1-100)"),
     }),
     annotations: TOOL_ANNOTATIONS,
     execute: async (args) => {
       try {
         const client = createClient()
-        const result = await client.searchPatents(args.query, args.search_type, args.limit)
+        const result = await client.searchPatents(args.query, args.search_type, args.match_type, args.limit)
         return JSON.stringify(result)
       } catch (error) {
         return handleApiError(error)

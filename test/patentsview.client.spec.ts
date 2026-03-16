@@ -9,7 +9,7 @@ describe.skipIf(!apiKey)("PatentsViewClient (integration)", () => {
 
   describe("searchPatents", () => {
     it("searches by text", async () => {
-      const result = await client.searchPatents("machine learning", "text", 2)
+      const result = await client.searchPatents("machine learning", "text", "all", 2)
       expect(result.error).toBe(false)
       expect(result.total_hits).toBeGreaterThan(0)
       expect(result.patents).toHaveLength(2)

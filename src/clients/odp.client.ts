@@ -36,11 +36,11 @@ export class OdpClient {
   // ── Application Methods ──────────────────────────────────────────────
 
   async searchApplications(query: string, limit?: number, offset?: number, sort?: string): Promise<unknown> {
-    const params: Record<string, string> = { searchText: query }
-    if (limit !== undefined) params.limit = String(limit)
-    if (offset !== undefined) params.offset = String(offset)
-    if (sort !== undefined) params.sort = sort
-    return this.client.get("patent/applications", params)
+    const body: Record<string, unknown> = { q: query }
+    if (limit !== undefined) body.rows = limit
+    if (offset !== undefined) body.start = offset
+    if (sort !== undefined) body.sort = sort
+    return this.client.post("patent/applications/search", body)
   }
 
   async getApplication(appNum: string): Promise<unknown> {

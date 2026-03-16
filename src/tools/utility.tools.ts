@@ -138,7 +138,7 @@ export const registerUtilityTools = (server: FastMCP): void => {
           const apiKey = config.patentsViewApiKey
           const healthResult = await checkApiHealth(
             "PatentsView",
-            "https://search.patentsview.org/api/v1/patent/?q=%7B%7D&f=%5B%22patent_id%22%5D&o=%7B%22size%22%3A1%7D",
+            "https://search.patentsview.org/api/v1/patent/?q=%7B%22patent_id%22%3A%2210000001%22%7D&f=%5B%22patent_id%22%5D&o=%7B%22size%22%3A1%7D",
             apiKey ? { "X-Api-Key": apiKey } : undefined,
           )
           pvStatus.healthy = healthResult.healthy

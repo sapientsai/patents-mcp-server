@@ -187,9 +187,9 @@ export const registerUtilityTools = (server: FastMCP): void => {
           healthy: false,
         }
         if (bqStatus.configured) {
-          bqStatus.healthy = !!config.googleApplicationCredentials
+          bqStatus.healthy = !!(config.googleApplicationCredentials || config.googleCredentialsJson)
         } else {
-          bqStatus.error = "GOOGLE_CLOUD_PROJECT / GOOGLE_APPLICATION_CREDENTIALS not set"
+          bqStatus.error = "GOOGLE_CLOUD_PROJECT / GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_CREDENTIALS_JSON not set"
         }
         statuses.push(bqStatus)
 

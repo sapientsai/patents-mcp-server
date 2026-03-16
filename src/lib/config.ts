@@ -2,12 +2,18 @@ import { expandPath } from "functype-os"
 
 import type { ApiStatus, LogLevel, TransportType } from "./types"
 
+type GcpCredentials = {
+  client_email: string
+  private_key: string
+}
+
 type AppConfig = {
   usptoApiKey: string | undefined
   patentsViewApiKey: string | undefined
   epoConsumerKey: string | undefined
   epoConsumerSecret: string | undefined
   googleApplicationCredentials: string | undefined
+  googleCredentialsJson: GcpCredentials | undefined
   googleCloudProject: string | undefined
   transport: TransportType
   port: number
@@ -28,6 +34,16 @@ const envPathOrUndefined = (key: string): string | undefined => {
   if (!value) return undefined
   const result = expandPath(value)
   return result.isRight() ? result.value : value
+}
+
+const envJsonOrUndefined = (key: string): GcpCredentials | undefined => {
+  const value = envOrUndefined(key)
+  if (!value) return undefined
+  try {
+    return JSON.parse(value) as GcpCredentials
+  } catch {
+    return undefined
+  }
 }
 
 const envOrDefault = (key: string, defaultValue: string): string => process.env[key] ?? defaultValue
@@ -58,6 +74,7 @@ export const loadConfig = (): AppConfig => ({
   epoConsumerKey: envOrUndefined("EPO_CONSUMER_KEY"),
   epoConsumerSecret: envOrUndefined("EPO_CONSUMER_SECRET"),
   googleApplicationCredentials: envPathOrUndefined("GOOGLE_APPLICATION_CREDENTIALS"),
+  googleCredentialsJson: envJsonOrUndefined("GOOGLE_CREDENTIALS_JSON"),
   googleCloudProject: envOrUndefined("GOOGLE_CLOUD_PROJECT"),
   transport: parseTransport(envOrDefault("TRANSPORT", "stdio")),
   port: envIntOrDefault("PORT", 8080),
@@ -86,7 +103,9 @@ export const getAvailableSources = (cfg: AppConfig): ApiStatus[] => [
   },
   {
     name: "Google BigQuery",
-    configured: cfg.googleApplicationCredentials !== undefined && cfg.googleCloudProject !== undefined,
+    configured:
+      (cfg.googleApplicationCredentials !== undefined || cfg.googleCredentialsJson !== undefined) &&
+      cfg.googleCloudProject !== undefined,
     healthy: false,
   },
 ]

@@ -12,6 +12,12 @@ type BigQueryResult = {
 }
 
 const getBigQueryClient = (): BigQuery => {
+  if (config.googleCredentialsJson) {
+    return new BigQuery({
+      projectId: config.googleCloudProject,
+      credentials: config.googleCredentialsJson,
+    })
+  }
   return new BigQuery({
     projectId: config.googleCloudProject,
     keyFilename: config.googleApplicationCredentials,

@@ -23,7 +23,7 @@ export const registerAllTools = (server: FastMCP): void => {
   if (config.epoConsumerKey && config.epoConsumerSecret) {
     registerEpoTools(server)
   }
-  if (config.googleApplicationCredentials && config.googleCloudProject) {
+  if ((config.googleApplicationCredentials || config.googleCredentialsJson) && config.googleCloudProject) {
     registerBigQueryTools(server)
   }
   registerUtilityTools(server)

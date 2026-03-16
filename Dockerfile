@@ -38,6 +38,7 @@ COPY --from=builder /app/dist ./dist
 # Set environment defaults
 ENV PORT=3000
 ENV TRANSPORT=httpStream
+ENV HOST=0.0.0.0
 
 EXPOSE 3000
 

@@ -14,6 +14,7 @@ if (config.transport === "httpStream") {
     transportType: "httpStream",
     httpStream: {
       port: config.port,
+      host: process.env.HOST ?? "0.0.0.0",
     },
   })
 } else {

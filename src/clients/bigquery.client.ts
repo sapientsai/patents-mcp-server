@@ -33,31 +33,41 @@ const estimateCost = (bytes: string): string => {
 const runQuery = async (sql: string, params?: Record<string, unknown>): Promise<BigQueryResult> => {
   const client = getBigQueryClient()
 
-  // Always dry run first to estimate cost
-  const [dryRunJob] = await client.createQueryJob({
-    query: sql,
-    params,
-    dryRun: true,
-    useLegacySql: false,
-  })
+  try {
+    // Always dry run first to estimate cost
+    const [dryRunJob] = await client.createQueryJob({
+      query: sql,
+      params,
+      dryRun: true,
+      useLegacySql: false,
+    })
 
-  const bytesProcessed = dryRunJob.metadata?.statistics?.totalBytesProcessed ?? "0"
-  const costEstimate = estimateCost(bytesProcessed)
+    const bytesProcessed = dryRunJob.metadata?.statistics?.totalBytesProcessed ?? "0"
+    const costEstimate = estimateCost(bytesProcessed)
 
-  // Execute the actual query
-  const [job] = await client.createQueryJob({
-    query: sql,
-    params,
-    useLegacySql: false,
-  })
+    // Execute the actual query
+    const [job] = await client.createQueryJob({
+      query: sql,
+      params,
+      useLegacySql: false,
+    })
 
-  const [rows] = await job.getQueryResults()
+    const [rows] = await job.getQueryResults()
 
-  return {
-    rows: rows as Record<string, unknown>[],
-    totalRows: rows.length,
-    estimatedBytesProcessed: bytesProcessed,
-    estimatedCostUsd: costEstimate,
+    return {
+      rows: rows as Record<string, unknown>[],
+      totalRows: rows.length,
+      estimatedBytesProcessed: bytesProcessed,
+      estimatedCostUsd: costEstimate,
+    }
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === "object" && error !== null
+          ? JSON.stringify(error)
+          : String(error)
+    throw new Error(`BigQuery error: ${message}`, { cause: error })
   }
 }
 

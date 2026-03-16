@@ -23,13 +23,9 @@ export const registerPatentsViewTools = (server: FastMCP): void => {
   server.addTool({
     name: "patentsview-search-patents",
     description:
-      "Search for patents on PatentsView by text query, assignee name, or inventor name. Returns patent metadata including title, abstract, date, assignees, and inventors.",
+      "Search patent abstracts on PatentsView. For assignee/inventor search, use the dedicated search-assignees and search-inventors tools instead.",
     parameters: z.object({
-      query: z.string().describe("Search query string (text, assignee name, or inventor name)"),
-      search_type: z
-        .enum(["text", "assignee", "inventor"])
-        .default("text")
-        .describe("Type of search: text (abstract search), assignee (organization), or inventor (name)"),
+      query: z.string().describe("Search terms to find in patent abstracts"),
       match_type: z
         .enum(["all", "any", "phrase"])
         .default("all")
@@ -42,7 +38,7 @@ export const registerPatentsViewTools = (server: FastMCP): void => {
     execute: async (args) => {
       try {
         const client = createClient()
-        const result = await client.searchPatents(args.query, args.search_type, args.match_type, args.limit)
+        const result = await client.searchPatents(args.query, args.match_type, args.limit)
         return JSON.stringify(result)
       } catch (error) {
         return handleApiError(error)

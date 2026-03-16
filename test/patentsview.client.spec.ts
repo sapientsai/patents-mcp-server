@@ -8,8 +8,8 @@ describe.skipIf(!apiKey)("PatentsViewClient (integration)", () => {
   const client = new PatentsViewClient({ apiKey })
 
   describe("searchPatents", () => {
-    it("searches by text", async () => {
-      const result = await client.searchPatents("machine learning", "text", "all", 2)
+    it("searches abstracts with all-words match", async () => {
+      const result = await client.searchPatents("machine learning", "all", 2)
       expect(result.error).toBe(false)
       expect(result.total_hits).toBeGreaterThan(0)
       expect(result.patents).toHaveLength(2)
@@ -18,10 +18,11 @@ describe.skipIf(!apiKey)("PatentsViewClient (integration)", () => {
       expect(result.patents![0]).toHaveProperty("patent_abstract")
     })
 
-    // TODO: assignee/inventor search via patent/ endpoint uses fields not queryable on that endpoint
-    // These need to be routed to the assignee/ and inventor/ endpoints instead
-    it.todo("searches by assignee")
-    it.todo("searches by inventor")
+    it("supports phrase matching", async () => {
+      const result = await client.searchPatents("perinucleolar compartment", "phrase", 2)
+      expect(result.error).toBe(false)
+      expect(result.total_hits).toBeGreaterThan(0)
+    })
   })
 
   describe("getPatent", () => {

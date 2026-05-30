@@ -9,7 +9,6 @@ type GcpCredentials = {
 
 type AppConfig = {
   usptoApiKey: string | undefined
-  patentsViewApiKey: string | undefined
   epoConsumerKey: string | undefined
   epoConsumerSecret: string | undefined
   googleApplicationCredentials: string | undefined
@@ -70,7 +69,6 @@ const parseLogLevel = (value: string): LogLevel => {
 
 export const loadConfig = (): AppConfig => ({
   usptoApiKey: envOrUndefined("USPTO_API_KEY"),
-  patentsViewApiKey: envOrUndefined("PATENTSVIEW_API_KEY"),
   epoConsumerKey: envOrUndefined("EPO_CONSUMER_KEY"),
   epoConsumerSecret: envOrUndefined("EPO_CONSUMER_SECRET"),
   googleApplicationCredentials: envPathOrUndefined("GOOGLE_APPLICATION_CREDENTIALS"),
@@ -89,11 +87,6 @@ export const getAvailableSources = (cfg: AppConfig): ApiStatus[] => [
   {
     name: "USPTO ODP",
     configured: cfg.usptoApiKey !== undefined,
-    healthy: false,
-  },
-  {
-    name: "PatentsView",
-    configured: cfg.patentsViewApiKey !== undefined,
     healthy: false,
   },
   {

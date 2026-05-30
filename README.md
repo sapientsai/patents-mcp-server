@@ -1,15 +1,16 @@
 # patents-mcp-server
 
-FastMCP TypeScript patent intelligence MCP server. 55 tools across USPTO, EPO, and Google Patents for IP landscape analysis, freedom-to-operate research, and patent monitoring.
+FastMCP TypeScript patent intelligence MCP server. 45 tools across USPTO, EPO, and Google Patents for IP landscape analysis, freedom-to-operate research, and patent monitoring.
+
+> **Note:** PatentsView support was removed in May 2026 — its API host `search.patentsview.org` was decommissioned on 2026-03-20 when PatentsView migrated to USPTO ODP as bulk-download datasets only (no live API replacement). US full-text search is now available via Google BigQuery; bibliographic data via USPTO ODP. See `docs/MCP_PLAN-PatentsView-Rehoming_2026-05-30.md` for the options analysis.
 
 ## Data Sources
 
-| Source              | Tools | Key Capability                                                                |
-| ------------------- | ----- | ----------------------------------------------------------------------------- |
-| **PatentsView**     | 14    | US patent search, disambiguated entities (assignees, inventors, attorneys)    |
-| **USPTO ODP**       | 29    | Applications, PTAB proceedings, citations, litigation, office actions         |
-| **EPO OPS**         | 8     | INPADOC patent families, legal status across ~44 offices, claims/descriptions |
-| **Google BigQuery** | 4     | Full-text search across 90M+ patents, citation networks, CPC analytics        |
+| Source              | Tools | Key Capability                                                                   |
+| ------------------- | ----- | -------------------------------------------------------------------------------- |
+| **USPTO ODP**       | 30    | Applications, document PDF download, PTAB, citations, litigation, office actions |
+| **EPO OPS**         | 8     | INPADOC patent families, legal status across ~44 offices, claims/descriptions    |
+| **Google BigQuery** | 4     | Full-text search across 90M+ patents, citation networks, CPC analytics           |
 
 Tools only register when their required API keys are configured — no broken tools cluttering the MCP client.
 
@@ -43,7 +44,6 @@ TRANSPORT=httpStream PORT=8080 node dist/index.js
       "args": ["dist/index.js"],
       "env": {
         "USPTO_API_KEY": "${USPTO_API_KEY}",
-        "PATENTSVIEW_API_KEY": "${PATENTSVIEW_API_KEY}",
         "EPO_CONSUMER_KEY": "${EPO_CONSUMER_KEY}",
         "EPO_CONSUMER_SECRET": "${EPO_CONSUMER_SECRET}",
         "GOOGLE_APPLICATION_CREDENTIALS": "${GOOGLE_APPLICATION_CREDENTIALS}",
@@ -64,12 +64,11 @@ npx @modelcontextprotocol/inspector node dist/index.js
 
 ### API Keys
 
-| Source      | Env Var(s)                                                | Where to Get                                                               |
-| ----------- | --------------------------------------------------------- | -------------------------------------------------------------------------- |
-| PatentsView | `PATENTSVIEW_API_KEY`                                     | [patentsview.org/apis/keyrequest](https://patentsview.org/apis/keyrequest) |
-| USPTO ODP   | `USPTO_API_KEY`                                           | [data.uspto.gov](https://data.uspto.gov/) → MyODP                          |
-| EPO OPS     | `EPO_CONSUMER_KEY` + `EPO_CONSUMER_SECRET`                | [developers.epo.org](https://developers.epo.org/)                          |
-| BigQuery    | `GOOGLE_APPLICATION_CREDENTIALS` + `GOOGLE_CLOUD_PROJECT` | GCP Console (service account with BigQuery roles)                          |
+| Source    | Env Var(s)                                                | Where to Get                                      |
+| --------- | --------------------------------------------------------- | ------------------------------------------------- |
+| USPTO ODP | `USPTO_API_KEY`                                           | [data.uspto.gov](https://data.uspto.gov/) → MyODP |
+| EPO OPS   | `EPO_CONSUMER_KEY` + `EPO_CONSUMER_SECRET`                | [developers.epo.org](https://developers.epo.org/) |
+| BigQuery  | `GOOGLE_APPLICATION_CREDENTIALS` + `GOOGLE_CLOUD_PROJECT` | GCP Console (service account with BigQuery roles) |
 
 Missing API keys disable related tools gracefully — the server still starts with whatever sources are configured. Use the `check-api-status` tool to verify which sources are available.
 
@@ -90,26 +89,13 @@ This project uses [envpkt](https://github.com/jordanburke/envpkt) for credential
 
 ## Tools
 
-### PatentsView (14 tools)
+### USPTO ODP (13 tools)
 
-Search and retrieve US patent data with disambiguated entities.
-
-- `patentsview-search-patents` — Full-text search by text, assignee, or inventor
-- `patentsview-get-patent` — Get patent by ID
-- `patentsview-search-assignees` / `get-assignee` — Disambiguated assignee search
-- `patentsview-search-inventors` / `get-inventor` — Disambiguated inventor search
-- `patentsview-search-attorneys` / `get-attorney` — Attorney search
-- `patentsview-get-claims` — Full claims text
-- `patentsview-get-description` — Patent description
-- `patentsview-search-by-cpc` / `lookup-cpc` — CPC classification search
-- `patentsview-search-by-ipc` / `lookup-ipc` — IPC classification search
-
-### USPTO ODP (12 tools)
-
-Official USPTO Open Data Portal — applications, prosecution history, assignments.
+Official USPTO Open Data Portal — applications, prosecution history, assignments, documents.
 
 - `odp-search-applications` — Search patent applications (2001+)
 - `odp-get-application` / `metadata` / `continuity` / `assignment` / `adjustment` / `attorney` / `foreign-priority` / `transactions` / `documents`
+- `odp-download-document` — Download a file-wrapper document as a PDF (proxies the authenticated fetch through the server's key)
 - `odp-search-datasets` / `get-dataset` — Bulk data products
 
 ### PTAB (7 tools)
@@ -173,12 +159,12 @@ Six workflow prompt templates for common patent analysis tasks:
 
 ## Resources
 
-| URI                       | Description                                              |
-| ------------------------- | -------------------------------------------------------- |
-| `patents://cpc/{code}`    | CPC classification info                                  |
-| `patents://status-codes`  | USPTO status code definitions                            |
-| `patents://sources`       | Data source overview                                     |
-| `patents://search-syntax` | Query syntax guide (PatentsView, EPO CQL, ODP, BigQuery) |
+| URI                       | Description                                 |
+| ------------------------- | ------------------------------------------- |
+| `patents://cpc/{code}`    | CPC classification info                     |
+| `patents://status-codes`  | USPTO status code definitions               |
+| `patents://sources`       | Data source overview                        |
+| `patents://search-syntax` | Query syntax guide (EPO CQL, ODP, BigQuery) |
 
 ## Development
 
@@ -196,8 +182,8 @@ pnpm fetch-specs     # Re-download OpenAPI specs from upstream
 Response schemas are generated from upstream OpenAPI specs using [Hey API](https://heyapi.dev/) with the Zod plugin:
 
 ```bash
-pnpm fetch-specs     # Download PatentsView + USPTO ODP specs
-pnpm codegen         # Generate src/generated/{patentsview,odp}/zod.gen.ts
+pnpm fetch-specs     # Download USPTO ODP spec
+pnpm codegen         # Generate src/generated/odp/zod.gen.ts
 ```
 
 Generated code is committed to the repo so CI doesn't need the codegen step.
@@ -207,7 +193,6 @@ Generated code is committed to the repo so CI doesn't need the codegen step.
 Integration tests run against live APIs when credentials are available:
 
 ```bash
-# Requires PATENTS_VIEW_API_KEY or PATENTSVIEW_API_KEY in env
 # Requires USPTO_API_KEY in env
 pnpm test
 ```
@@ -222,8 +207,8 @@ Built with [FastMCP](https://github.com/punkpeye/fastmcp) + [Zod](https://zod.de
 src/
 ├── index.ts                    # Entry point
 ├── server.ts                   # FastMCP instance
-├── tools/                      # 55 tools across 8 modules (conditional registration)
-├── clients/                    # API clients (base, PatentsView, ODP, EPO, BigQuery)
+├── tools/                      # 45 tools across 7 modules (conditional registration)
+├── clients/                    # API clients (base, ODP, EPO, BigQuery)
 ├── generated/                  # Zod schemas from OpenAPI specs (Hey API codegen)
 ├── specs/                      # Local copies of OpenAPI specs
 ├── resources/                  # 4 MCP resources
@@ -239,7 +224,6 @@ MIT
 
 - [USPTO](https://www.uspto.gov/) - US Patent and Trademark Office
 - [EPO OPS](https://www.epo.org/en/searching-for-patents/data/web-services/ops) - European Patent Office Open Patent Services
-- [PatentsView](https://patentsview.org/) - USPTO patent data platform
 - [Google Patents Public Data](https://console.cloud.google.com/marketplace/product/google_patents_public_datasets/google-patents-public-data) - BigQuery patent dataset
 
 ---

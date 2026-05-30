@@ -212,6 +212,39 @@ export const registerOdpTools = (server: FastMCP): void => {
   })
 
   server.addTool({
+    name: "odp-download-document",
+    description:
+      "Download a patent file-wrapper document as a PDF from the USPTO Open Data Portal. Provide an application number and the documentIdentifier from odp-get-documents (downloadOptionBag). The server's USPTO_API_KEY authenticates the fetch and follows the ODP redirect; the PDF is returned as a base64 resource.",
+    parameters: z.object({
+      applicationNumberText: z.string().describe("Application number (e.g., 16/123,456 or 16123456)"),
+      documentIdentifier: z
+        .string()
+        .describe("Document identifier from odp-get-documents downloadOptionBag (e.g., 'M4IR8IRKWFYGX56')"),
+    }),
+    annotations: ODP_ANNOTATIONS,
+    execute: async (args) => {
+      try {
+        const client = createClient()
+        const { data } = await client.downloadDocument(args.applicationNumberText, args.documentIdentifier)
+        return {
+          content: [
+            {
+              type: "resource",
+              resource: {
+                uri: `https://api.uspto.gov/api/v1/download/applications/${args.applicationNumberText}/${args.documentIdentifier}.pdf`,
+                mimeType: "application/pdf",
+                blob: Buffer.from(data).toString("base64"),
+              },
+            },
+          ],
+        }
+      } catch (error) {
+        return handleApiError(error)
+      }
+    },
+  })
+
+  server.addTool({
     name: "odp-search-datasets",
     description: "Search USPTO bulk data datasets available through the Open Data Portal.",
     parameters: z.object({

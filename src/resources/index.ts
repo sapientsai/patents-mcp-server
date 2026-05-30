@@ -22,13 +22,6 @@ const STATUS_CODES: Record<string, string> = {
 
 const SOURCES_DESCRIPTION = `# Patent Data Sources
 
-## PatentsView (search.patentsview.org)
-- **Coverage**: Granted US patents 1976–present, pre-grant publications 2001–present
-- **Strengths**: Full-text search, disambiguated entities (assignees, inventors, attorneys)
-- **Auth**: Optional API key (key grants suspended March 2026)
-- **Rate limit**: 45 req/min
-- **Note**: Migrating to USPTO Open Data Portal (ODP). May return 403 after March 20, 2026.
-
 ## USPTO Open Data Portal - ODP (api.uspto.gov)
 - **Coverage**: Patent applications filed January 1, 2001+
 - **Strengths**: Official USPTO data, prosecution history, assignments, continuity
@@ -65,20 +58,6 @@ const SOURCES_DESCRIPTION = `# Patent Data Sources
 - **Strengths**: Rejection text, examiner citations, response history`
 
 const SEARCH_SYNTAX = `# Patent Search Syntax Guide
-
-## PatentsView Query Format
-PatentsView uses a JSON query format with q/f/s/o parameters:
-
-### Query operators (q):
-- \`{"_text_any": {"patent_abstract": "drug delivery"}}\` — text search
-- \`{"_eq": {"patent_number": "11646472"}}\` — exact match
-- \`{"_begins": {"cpc_group_id": "A61K"}}\` — prefix match
-- \`{"_and": [{...}, {...}]}\` — combine conditions
-- \`{"_or": [{...}, {...}]}\` — alternative conditions
-
-### Fields (f): Array of field names to return
-### Sort (s): Array of {field: "asc"|"desc"} objects
-### Options (o): {"limit": 25, "offset": 0}
 
 ## EPO CQL (Contextual Query Language)
 Used with epo-search-patents tool:
@@ -128,7 +107,7 @@ export const registerResources = (server: FastMCP): void => {
         text: JSON.stringify(
           {
             code: args.code,
-            note: "Use get-cpc-info tool or patentsview-lookup-cpc for detailed CPC information",
+            note: "Use the get-cpc-info tool for detailed CPC information",
             sections: {
               A: "Human Necessities",
               B: "Performing Operations; Transporting",
@@ -171,7 +150,7 @@ export const registerResources = (server: FastMCP): void => {
   server.addResource({
     uri: "patents://search-syntax",
     name: "Search Syntax Guide",
-    description: "Query syntax guide for PatentsView, EPO CQL, ODP, and BigQuery",
+    description: "Query syntax guide for EPO CQL, ODP, and BigQuery",
     mimeType: "text/markdown",
     load: async () => ({
       text: SEARCH_SYNTAX,

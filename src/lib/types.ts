@@ -19,4 +19,4 @@ export type TransportType = "stdio" | "httpStream"
 
 export type LogLevel = "DEBUG" | "INFO" | "WARN" | "ERROR"
 
-export type PatentSource = "USPTO" | "PatentsView" | "EPO" | "GooglePatents"
+export type PatentSource = "USPTO" | "EPO" | "GooglePatents"

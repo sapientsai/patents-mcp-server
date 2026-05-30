@@ -30,14 +30,14 @@
     "build": "ts-builds build",
     "dev": "ts-builds dev",
     "codegen": "openapi-ts",
-    "fetch-specs": "curl -s https://search.patentsview.org/static/openapi.json > src/specs/patentsview.json && gh api repos/patent-dev/uspto-odp/contents/swagger_fixed.yaml --jq '.content' | base64 -d > src/specs/uspto-odp.yaml",
+    "fetch-specs": "gh api repos/patent-dev/uspto-odp/contents/swagger_fixed.yaml --jq '.content' | base64 -d > src/specs/uspto-odp.yaml",
     "prepublishOnly": "pnpm validate"
   },
   "devDependencies": {
-    "@hey-api/openapi-ts": "^0.94.1",
-    "@types/node": "^24.12.0",
-    "ts-builds": "^2.5.2",
-    "tsdown": "^0.21.3"
+    "@hey-api/openapi-ts": "^0.94.5",
+    "@types/node": "^24.12.4",
+    "ts-builds": "^2.8.1",
+    "tsdown": "^0.22.1"
   },
   "bin": {
     "patents-mcp-server": "./dist/index.js"
@@ -58,13 +58,13 @@
     "dist"
   ],
   "prettier": "ts-builds/prettier",
-  "packageManager": "pnpm@10.32.1+sha512.a706938f0e89ac1456b6563eab4edf1d1faf3368d1191fc5c59790e96dc918e4456ab2e67d613de1043d2e8c81f87303e6b40d4ffeca9df15ef1ad567348f2be",
+  "packageManager": "pnpm@10.34.1+sha512.b58fbde6dca66a929538021581f648b4570b6ca19b18e7cbd7f2c07a7b24454155388dacdf08f2af3678e88a6d1fe04f9d609df24bf51735a060ea041b374ab7",
   "dependencies": {
-    "@google-cloud/bigquery": "^8.1.1",
-    "fast-xml-parser": "^5.5.5",
-    "fastmcp": "^3.34.0",
-    "functype": "^0.49.0",
-    "functype-os": "^0.3.0",
-    "zod": "^4.3.6"
+    "@google-cloud/bigquery": "^8.3.1",
+    "fast-xml-parser": "^5.8.0",
+    "fastmcp": "^4.0.1",
+    "functype": "^1.0.1",
+    "functype-os": "^1.0.1",
+    "zod": "^4.4.3"
   }
 }

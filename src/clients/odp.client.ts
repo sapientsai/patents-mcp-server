@@ -83,6 +83,13 @@ export class OdpClient {
     return this.client.get(`patent/applications/${normalizePatentNumber(appNum)}/documents`)
   }
 
+  async downloadDocument(
+    appNum: string,
+    documentIdentifier: string,
+  ): Promise<{ data: Uint8Array; contentType: string }> {
+    return this.client.getBinary(`download/applications/${normalizePatentNumber(appNum)}/${documentIdentifier}.pdf`)
+  }
+
   // ── Dataset Methods ──────────────────────────────────────────────────
 
   async searchDatasets(query: string): Promise<unknown> {

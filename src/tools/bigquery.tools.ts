@@ -24,7 +24,7 @@ Searches title and abstract fields. Returns publication number, title, abstract,
 Cost estimate is included in every response. Free tier: 1 TB/month.
 
 Use this for broad full-text patent search, especially when you need to search across claims text
-or when PatentsView/EPO results are insufficient.`,
+or when ODP/EPO results are insufficient.`,
     parameters: z.object({
       query: z.string().describe("Search terms to find in patent titles and abstracts"),
       fields: z

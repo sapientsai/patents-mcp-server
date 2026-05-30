@@ -45,6 +45,11 @@ export class BaseClient {
     return withRetry(() => this.request<T>(url, init))
   }
 
+  async getBinary(path: string, params?: Record<string, string>): Promise<{ data: Uint8Array; contentType: string }> {
+    const url = this.buildUrl(path, params)
+    return withRetry(() => this.requestBinary(url))
+  }
+
   private buildUrl(path: string, params?: Record<string, string>): string {
     const url = new URL(path, this.baseUrl)
     if (params) {
@@ -74,6 +79,38 @@ export class BaseClient {
       }
 
       return (await response.json()) as T
+    } catch (error) {
+      if (error instanceof Error && "status" in error) throw error
+
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new Error(`Request to ${url} timed out after ${this.timeout}ms`, { cause: error })
+      }
+
+      throw error
+    } finally {
+      clearTimeout(timeoutId)
+    }
+  }
+
+  private async requestBinary(url: string): Promise<{ data: Uint8Array; contentType: string }> {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout)
+
+    try {
+      // fetch follows the ODP 302 redirect to the pre-signed download URL automatically
+      const response = await fetch(url, {
+        method: "GET",
+        headers: { ...this.headers, Accept: "*/*" },
+        signal: controller.signal,
+      })
+
+      if (!response.ok) {
+        const body = await response.text()
+        throw createHttpError(response.status, response.statusText, body)
+      }
+
+      const data = new Uint8Array(await response.arrayBuffer())
+      return { data, contentType: response.headers.get("content-type") ?? "application/octet-stream" }
     } catch (error) {
       if (error instanceof Error && "status" in error) throw error
 

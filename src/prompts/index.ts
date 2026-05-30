@@ -34,19 +34,19 @@ ${args.cpc_codes ? `## CPC Codes\n${args.cpc_codes}\n` : ""}
 
 ### Step 1: Keyword Search
 Search across patent databases using key terms and synonyms:
-- Use \`patentsview-search-patents\` for US granted patents (full-text search)
+- Use \`bigquery-patent-search\` for US full-text title/abstract search at scale
 - Use \`epo-search-patents\` for international patents (CQL: ti/ab/ta fields)
-- Use \`bigquery-patent-search\` for full-text claims search at scale
+- Use \`odp-search-applications\` for US application bibliographic search
 
 ### Step 2: Classification Search
 Search by CPC/IPC codes for relevant technology areas:
-- Use \`patentsview-search-by-cpc\` for US patents by CPC code
-- Use \`epo-search-patents\` with cpc= field for international coverage
+- Use \`epo-search-patents\` with cpc= field for classification search
+- Use \`bigquery-cpc-analytics\` for CPC filing statistics
 
 ### Step 3: Assignee/Inventor Search
 Identify key players and their patent portfolios:
-- Use \`patentsview-search-assignees\` to find relevant companies
-- Use \`patentsview-search-inventors\` to find key inventors
+- Use \`odp-search-applications\` to find US applications by assignee/inventor name
+- Use \`epo-search-patents\` with pa=/in= fields for international players
 
 ### Step 4: Citation Analysis
 Trace citation networks from relevant patents found:
@@ -88,9 +88,9 @@ ${args.claims_of_interest ? `## Claims of Interest: ${args.claims_of_interest}\n
 
 ### Step 1: Patent Details
 Retrieve complete patent information:
-- Use \`patentsview-get-patent\` for bibliographic data
-- Use \`patentsview-get-claims\` or \`epo-get-claims\` for claim text
-- Use \`patentsview-get-description\` or \`epo-get-description\` for specification
+- Use \`odp-get-application\` / \`odp-get-application-metadata\` for bibliographic data
+- Use \`epo-get-claims\` for claim text (EP/WO coverage)
+- Use \`epo-get-description\` for specification (EP/WO coverage)
 
 ### Step 2: Prosecution History
 Review the patent's prosecution history:
@@ -149,15 +149,13 @@ ${args.technology_area ? `## Technology Focus: ${args.technology_area}\n` : ""}
 
 ### Step 1: Identify Portfolio
 Find all patents assigned to the company:
-- Use \`patentsview-search-assignees\` to find disambiguated assignee ID
-- Use \`patentsview-search-patents\` with assignee filter
 - Use \`epo-search-patents\` with pa="${args.company_name}" for international filings
-- Use \`odp-search-applications\` for pending US applications
+- Use \`odp-search-applications\` for US applications by applicant name
+- Use \`bigquery-patent-search\` for US granted patents
 
 ### Step 2: Technology Breakdown
 Classify the portfolio by technology area:
-- Use \`patentsview-search-by-cpc\` for CPC classification distribution
-- Use \`bigquery-cpc-analytics\` for statistical analysis
+- Use \`bigquery-cpc-analytics\` for CPC classification distribution
 - Identify core technology clusters
 
 ### Step 3: Filing Trends
@@ -276,15 +274,13 @@ ${args.key_features ? `## Key Features: ${args.key_features}\n` : ""}
 
 ### Step 2: Patent Search
 Comprehensive search for potentially blocking patents:
-- Use \`patentsview-search-patents\` for US patents
-- Use \`epo-search-patents\` for international patents
-- Use \`bigquery-patent-search\` for full-text claims search
-- Use \`patentsview-search-by-cpc\` for classification-based search
-- Use \`odp-search-applications\` for pending applications
+- Use \`bigquery-patent-search\` for US full-text title/abstract search
+- Use \`epo-search-patents\` for international patents (incl. cpc= classification)
+- Use \`odp-search-applications\` for US applications (incl. pending)
 
 ### Step 3: Claim Analysis
 For each potentially relevant patent:
-- Use \`patentsview-get-claims\` or \`epo-get-claims\` to read claim language
+- Use \`epo-get-claims\` to read claim language (EP/WO coverage)
 - Map product features to claim elements
 - Identify independent claims vs. dependent claims
 - Assess literal infringement and doctrine of equivalents
@@ -352,11 +348,10 @@ ${args.date_range ? `## Date Range: ${args.date_range}\n` : ""}
 
 ### Step 2: Quantitative Overview
 - Use \`bigquery-cpc-analytics\` for filing statistics by CPC
-- Use \`patentsview-search-by-cpc\` for US patent counts
 - Track filing trends over time
 
 ### Step 3: Key Players
-- Use \`patentsview-search-assignees\` to identify top filers
+- Use \`bigquery-patent-search\` / \`odp-search-applications\` to identify top filers
 - Use \`epo-search-patents\` with pa= for international filers
 - Rank assignees by portfolio size and growth rate
 

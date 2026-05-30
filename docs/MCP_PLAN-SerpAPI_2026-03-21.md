@@ -33,6 +33,7 @@ Define types for search params, organic results, and details response.
 Export `registerSerpApiTools(server: FastMCP)` with two tools:
 
 **`serpapi-patent-search`** — Google Patents full-text search
+
 - `query` (string, required)
 - `page` (number, optional, default 1)
 - `num` (number, optional, 10-100, default 10)
@@ -45,6 +46,7 @@ Export `registerSerpApiTools(server: FastMCP)` with two tools:
 - `sort` (enum "new" | "old" | "relevance", optional)
 
 **`serpapi-patent-details`** — Full patent details
+
 - `patent_id` (string, required) — e.g., "US-10301314-B2"
 
 Both use `readOnlyAnnotations`.
@@ -52,6 +54,7 @@ Both use `readOnlyAnnotations`.
 ## Files to Modify
 
 ### 3. `src/lib/config.ts`
+
 - Add `serpApiKey: string | undefined` to `AppConfig` type
 - Add `serpApiKey: envOrUndefined("SERPAPI_API_KEY")` to `loadConfig()`
 - Add SerpAPI entry to `getAvailableSources()`:
@@ -60,27 +63,33 @@ Both use `readOnlyAnnotations`.
   ```
 
 ### 4. `src/tools/index.ts`
+
 - Import `registerSerpApiTools`
 - Add: `if (config.serpApiKey) { registerSerpApiTools(server) }`
 
 ### 5. `src/tools/bigquery.tools.ts`
+
 - Remove `bigquery-patent-search` tool registration (keep other 3)
 - Remove `bigqueryPatentSearch` import
 
 ### 6. `src/clients/bigquery.client.ts`
+
 - Remove `bigqueryPatentSearch` export function
 - Keep `bigqueryPatentFamily`, `bigqueryCitationNetwork`, `bigqueryCpcAnalytics`
 
 ### 7. `src/tools/utility.tools.ts`
+
 - Add SerpAPI health check in `check-api-status` tool (use `https://serpapi.com/account?api_key=...` endpoint)
 - Update tool description to mention SerpAPI
 
 ### 8. `src/resources/index.ts`
+
 - Add SerpAPI section to `patents://sources` resource
 - Add SerpAPI syntax to `patents://search-syntax` resource
 - Update BigQuery section to note it no longer has full-text search
 
 ### 9. `.env.example`
+
 - Add `SERPAPI_API_KEY=` with comment
 - Update BigQuery comment (no longer for full-text search)
 

@@ -5,12 +5,13 @@
       "args": ["dist/index.js"],
       "env": {
         "USPTO_API_KEY": "${USPTO_API_KEY}",
-        "PATENTSVIEW_API_KEY": "${PATENTS_VIEW_API_KEY}",
         "EPO_CONSUMER_KEY": "",
-        "EPO_CONSUMER_SECRET": "",
-        "GOOGLE_APPLICATION_CREDENTIALS": "${GOOGLE_APPLICATION_CREDENTIALS}",
-        "GOOGLE_CLOUD_PROJECT": "${GOOGLE_CLOUD_PROJECT}"
+        "EPO_CONSUMER_SECRET": ""
       }
+    },
+    "civala-patents": {
+      "type": "http",
+      "url": "https://patents.civala.ai/mcp"
     }
   }
 }

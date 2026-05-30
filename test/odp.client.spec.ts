@@ -42,4 +42,40 @@ describe.skipIf(!apiKey)("OdpClient (integration)", () => {
       expect(result).toBeDefined()
     })
   })
+
+  describe("downloadDocument", () => {
+    it("downloads a file-wrapper document as a PDF", async () => {
+      // Find a document with a PDF download option, then download it.
+      const docs = (await client.getDocuments("16330077")) as unknown
+      const findPdfDoc = (node: unknown): { id: string } | undefined => {
+        if (Array.isArray(node)) {
+          for (const item of node) {
+            const found = findPdfDoc(item)
+            if (found) return found
+          }
+        } else if (node && typeof node === "object") {
+          const obj = node as Record<string, unknown>
+          const options = obj.downloadOptionBag
+          if (typeof obj.documentIdentifier === "string" && Array.isArray(options)) {
+            const hasPdf = options.some((o) => (o as Record<string, unknown>).mimeTypeIdentifier === "PDF")
+            if (hasPdf) return { id: obj.documentIdentifier }
+          }
+          for (const value of Object.values(obj)) {
+            const found = findPdfDoc(value)
+            if (found) return found
+          }
+        }
+        return undefined
+      }
+
+      const doc = findPdfDoc(docs)
+      expect(doc).toBeDefined()
+
+      const { data, contentType } = await client.downloadDocument("16330077", doc!.id)
+      expect(data.length).toBeGreaterThan(0)
+      // PDF magic bytes: %PDF
+      expect(Buffer.from(data.subarray(0, 4)).toString("ascii")).toBe("%PDF")
+      expect(contentType).toBeDefined()
+    })
+  })
 })

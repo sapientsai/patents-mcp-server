@@ -38,6 +38,13 @@ const isErrorWithResponse = (error: unknown): error is { response: { status: num
   typeof (error as Record<string, unknown>).response === "object" &&
   (error as Record<string, unknown>).response !== null
 
+/** True when the error carries an HTTP 403, however it is shaped. */
+export const isForbiddenError = (error: unknown): boolean => {
+  if (isErrorWithStatus(error)) return error.status === 403
+  if (isErrorWithResponse(error)) return error.response.status === 403
+  return false
+}
+
 export const handleApiError = (error: unknown): string => {
   if (error instanceof UserError) {
     return error.message

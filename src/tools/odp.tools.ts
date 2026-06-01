@@ -236,7 +236,9 @@ export const registerOdpTools = (server: FastMCP): void => {
   server.addTool({
     name: "odp-download-document",
     description:
-      "Download a patent file-wrapper document as a PDF from the USPTO Open Data Portal. Provide an application number and the documentIdentifier from odp-get-documents (downloadOptionBag). The server's USPTO_API_KEY authenticates the fetch and follows the ODP redirect, then caches the PDF transiently and returns a fetchable URL — JSON of the form { url, mimeType, expiresInSeconds }. Fetch the URL to retrieve the PDF; it expires after expiresInSeconds.",
+      "Retrieve the full text and content of any patent file-wrapper document — specifications, claims, drawings, office actions (rejections), applicant amendments and remarks, interview summaries, examiner search notes, and prior-art reference lists. This is the authoritative way to read what a document actually says: fetch the documentIdentifier from odp-get-documents (downloadOptionBag), and this tool downloads it and returns a fetchable URL (JSON of the form { url, mimeType, expiresInSeconds }; fetch the URL to retrieve the PDF, which expires after expiresInSeconds). " +
+      'Use this whenever a question requires the contents of a prosecution document — e.g. "what was the examiner\'s rejection," "how did the applicant respond," "what prior art was cited." It is also the reliable fallback when the structured office-action endpoints (office-action-get-text/-rejections/-citations) are unavailable or return access errors, since those depend on a separate USPTO data tier. ' +
+      "Note: older documents are often scanned images with no embedded text layer. The returned PDF is still complete and readable — the consumer should OCR it (rasterize + text-recognize) when direct text extraction yields nothing.",
     parameters: z.object({
       applicationNumberText: z.string().describe("Application number (e.g., 16/123,456 or 16123456)"),
       documentIdentifier: z

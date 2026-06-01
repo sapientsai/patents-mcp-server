@@ -3,7 +3,7 @@ import { z } from "zod"
 
 import { OdpClient } from "../clients/odp.client"
 import { config } from "../lib/config"
-import { handleApiError } from "../lib/errors"
+import { handleApiError, isForbiddenError } from "../lib/errors"
 
 const OA_ANNOTATIONS = {
   readOnlyHint: true,
@@ -11,6 +11,20 @@ const OA_ANNOTATIONS = {
   idempotentHint: true,
   openWorldHint: true,
 } as const
+
+/**
+ * The structured office-action endpoints sit on a USPTO data tier the ODP key is not entitled to,
+ * so they return HTTP 403 even when ODP itself is healthy. Rather than dead-ending, route the agent
+ * to the file-wrapper download path, which serves the same content (the actual office-action PDFs).
+ */
+export const OA_FALLBACK_MESSAGE =
+  "The structured office-action endpoint is unavailable for this credential (HTTP 403 — the office-action " +
+  "data tier is not part of the USPTO ODP product this key is entitled to). To read office-action content, " +
+  "list the application's documents with odp-get-documents, then download the relevant office-action document " +
+  "with odp-download-document and read the returned PDF (OCR it if it is a scanned image with no text layer)."
+
+export const handleOfficeActionError = (error: unknown): string =>
+  isForbiddenError(error) ? OA_FALLBACK_MESSAGE : handleApiError(error)
 
 const createClient = (): OdpClient => {
   return new OdpClient({
@@ -38,7 +52,7 @@ export const registerOfficeActionsTools = (server: FastMCP): void => {
         const result = await client.getOfficeActionText(args.applicationNumber)
         return JSON.stringify(result)
       } catch (error) {
-        return handleApiError(error)
+        return handleOfficeActionError(error)
       }
     },
   })
@@ -57,7 +71,7 @@ export const registerOfficeActionsTools = (server: FastMCP): void => {
         const result = await client.searchOfficeActions(args.query, args.limit)
         return JSON.stringify(result)
       } catch (error) {
-        return handleApiError(error)
+        return handleOfficeActionError(error)
       }
     },
   })
@@ -76,7 +90,7 @@ export const registerOfficeActionsTools = (server: FastMCP): void => {
         const result = await client.getOfficeActionCitations(args.applicationNumber)
         return JSON.stringify(result)
       } catch (error) {
-        return handleApiError(error)
+        return handleOfficeActionError(error)
       }
     },
   })
@@ -95,7 +109,7 @@ export const registerOfficeActionsTools = (server: FastMCP): void => {
         const result = await client.getOfficeActionRejections(args.applicationNumber)
         return JSON.stringify(result)
       } catch (error) {
-        return handleApiError(error)
+        return handleOfficeActionError(error)
       }
     },
   })

@@ -102,7 +102,7 @@ Generated schemas provide typed response validation.
 - **No PatentsView**: Removed — `search.patentsview.org` decommissioned 2026-03-20 (migrated to ODP bulk datasets only; no live API). US full-text search now via BigQuery; bibliographic via ODP
 - **Conditional tool registration**: Tools only appear when their API keys are configured
 - **functype-os**: Used for `~` and `$HOME` path expansion in `GOOGLE_APPLICATION_CREDENTIALS`
-- **ODP document download**: `odp-download-document` proxies the binary PDF fetch through the server's `USPTO_API_KEY`; `BaseClient.getBinary` follows ODP's 302 redirect to the pre-signed download URL and returns a base64 PDF resource
+- **ODP document download**: `odp-download-document` proxies the binary PDF fetch through the server's `USPTO_API_KEY` (`BaseClient.getBinary` follows ODP's 302 redirect to the pre-signed URL), writes the PDF to a transient UUID-keyed store (`src/resources/store.ts`), and returns JSON `{ url, mimeType, expiresInSeconds }` — a fetchable URL on `PUBLIC_BASE_URL`, never the bytes. The PDF is served by `GET /resources/{uuid}.pdf` (`src/resources/routes.ts`), gated at the edge alongside `/mcp`; the unguessable v4 UUID + TTL (`RESOURCE_TTL_SECONDS`) are in-app defense-in-depth. Keeps multi-page file-wrapper PDFs out of the model context
 - **Native fetch**: Node 22 built-in, no axios dependency
 - **EPO XML**: Parsed with fast-xml-parser, namespace-aware
 - **BigQuery**: Mandatory dryRun before every query, cost reported in responses; full-text search uses UNNEST for array struct fields

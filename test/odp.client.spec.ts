@@ -76,6 +76,7 @@ describe.skipIf(!apiKey)("OdpClient (integration)", () => {
       // PDF magic bytes: %PDF
       expect(Buffer.from(data.subarray(0, 4)).toString("ascii")).toBe("%PDF")
       expect(contentType).toBeDefined()
-    })
+      // Live fetch follows a 302 to a presigned URL and pulls a multi-MB PDF — exceeds the 5s default.
+    }, 30000)
   })
 })

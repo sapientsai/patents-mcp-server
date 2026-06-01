@@ -21,6 +21,9 @@ type AppConfig = {
   maxRetries: number
   retryMinWait: number
   retryMaxWait: number
+  resourceDir: string
+  resourceTtlSeconds: number
+  publicBaseUrl: string
 }
 
 const envOrUndefined = (key: string): string | undefined => {
@@ -81,6 +84,9 @@ export const loadConfig = (): AppConfig => ({
   maxRetries: envIntOrDefault("MAX_RETRIES", 3),
   retryMinWait: envIntOrDefault("RETRY_MIN_WAIT", 2000),
   retryMaxWait: envIntOrDefault("RETRY_MAX_WAIT", 10000),
+  resourceDir: envOrDefault("RESOURCE_DIR", "/tmp/odp-cache"),
+  resourceTtlSeconds: envIntOrDefault("RESOURCE_TTL_SECONDS", 600),
+  publicBaseUrl: envOrDefault("PUBLIC_BASE_URL", "https://patents.civala.ai").replace(/\/+$/, ""),
 })
 
 export const getAvailableSources = (cfg: AppConfig): ApiStatus[] => [

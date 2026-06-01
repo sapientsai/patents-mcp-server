@@ -2,12 +2,16 @@
 import { config } from "./lib/config"
 import { registerPrompts } from "./prompts/index"
 import { registerResources } from "./resources/index"
+import { registerResourceRoutes } from "./resources/routes"
+import { resourceStore } from "./resources/store"
 import { server } from "./server"
 import { registerAllTools } from "./tools/index"
 
 registerAllTools(server)
 registerResources(server)
 registerPrompts(server)
+registerResourceRoutes(server)
+resourceStore.startSweep()
 
 if (config.transport === "httpStream") {
   server.start({

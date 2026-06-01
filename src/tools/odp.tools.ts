@@ -4,6 +4,7 @@ import { z } from "zod"
 import { OdpClient } from "../clients/odp.client"
 import { config } from "../lib/config"
 import { handleApiError } from "../lib/errors"
+import { type FileStore, resourceStore } from "../resources/store"
 
 const ODP_ANNOTATIONS = {
   readOnlyHint: true,
@@ -19,6 +20,27 @@ const createClient = (): OdpClient => {
   return new OdpClient({
     apiKey: config.usptoApiKey,
     timeout: config.requestTimeout,
+  })
+}
+
+/**
+ * Fetches a file-wrapper PDF from USPTO, stashes it in the transient store, and returns the
+ * JSON payload the tool surfaces: a fetchable URL on the server's own host (never the bytes,
+ * never the USPTO key). Exported for testing.
+ */
+export const buildDownloadResult = async (
+  client: Pick<OdpClient, "downloadDocument">,
+  applicationNumberText: string,
+  documentIdentifier: string,
+  store: FileStore = resourceStore,
+  baseUrl: string = config.publicBaseUrl,
+): Promise<string> => {
+  const { data } = await client.downloadDocument(applicationNumberText, documentIdentifier)
+  const { id } = store.put(Buffer.from(data), "pdf")
+  return JSON.stringify({
+    url: `${baseUrl}/resources/${id}.pdf`,
+    mimeType: "application/pdf",
+    expiresInSeconds: store.ttlSeconds,
   })
 }
 
@@ -214,7 +236,7 @@ export const registerOdpTools = (server: FastMCP): void => {
   server.addTool({
     name: "odp-download-document",
     description:
-      "Download a patent file-wrapper document as a PDF from the USPTO Open Data Portal. Provide an application number and the documentIdentifier from odp-get-documents (downloadOptionBag). The server's USPTO_API_KEY authenticates the fetch and follows the ODP redirect; the PDF is returned as a base64 resource.",
+      "Download a patent file-wrapper document as a PDF from the USPTO Open Data Portal. Provide an application number and the documentIdentifier from odp-get-documents (downloadOptionBag). The server's USPTO_API_KEY authenticates the fetch and follows the ODP redirect, then caches the PDF transiently and returns a fetchable URL — JSON of the form { url, mimeType, expiresInSeconds }. Fetch the URL to retrieve the PDF; it expires after expiresInSeconds.",
     parameters: z.object({
       applicationNumberText: z.string().describe("Application number (e.g., 16/123,456 or 16123456)"),
       documentIdentifier: z
@@ -225,19 +247,7 @@ export const registerOdpTools = (server: FastMCP): void => {
     execute: async (args) => {
       try {
         const client = createClient()
-        const { data } = await client.downloadDocument(args.applicationNumberText, args.documentIdentifier)
-        return {
-          content: [
-            {
-              type: "resource",
-              resource: {
-                uri: `https://api.uspto.gov/api/v1/download/applications/${args.applicationNumberText}/${args.documentIdentifier}.pdf`,
-                mimeType: "application/pdf",
-                blob: Buffer.from(data).toString("base64"),
-              },
-            },
-          ],
-        }
+        return await buildDownloadResult(client, args.applicationNumberText, args.documentIdentifier)
       } catch (error) {
         return handleApiError(error)
       }

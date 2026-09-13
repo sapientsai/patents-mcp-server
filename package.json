@@ -1,7 +1,7 @@
 {
   "name": "patents-mcp-server",
   "version": "1.0.4",
-  "description": "FastMCP TypeScript patent intelligence MCP server — 55 tools across USPTO, EPO, and BigQuery",
+  "description": "FastMCP TypeScript patent intelligence MCP server \u2014 55 tools across USPTO, EPO, and BigQuery",
   "keywords": [
     "mcp",
     "patents",
@@ -58,7 +58,7 @@
     "dist"
   ],
   "prettier": "ts-builds/prettier",
-  "packageManager": "pnpm@11.5.2+sha512.71c631e382066efc25625d5cf029075de07b61b37f6e27350fbd84b1bda5864c8c1967adc280776b45c30a715c0359a3be08fef42d5bb09e2b99029979692916",
+  "packageManager": "pnpm@11.27.0+sha512.ad12821463bb143295f1fa3ecde77a6b9b97a7990386da800ff57bffc3964dc64b7b1c7559d5dbe5c337aea659ed9c8937d4370bd198ca2009bc6fa0249808e7",
   "dependencies": {
     "@google-cloud/bigquery": "^8.3.1",
     "fast-xml-parser": "^5.8.0",

@@ -7,7 +7,9 @@ RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 WORKDIR /app
 
 # Copy package files
-COPY package.json pnpm-lock.yaml ./
+# pnpm-workspace.yaml carries the `overrides` block; without it `--frozen-lockfile` fails with
+# ERR_PNPM_LOCKFILE_CONFIG_MISMATCH, because the lockfile records overrides the config lacks.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
@@ -27,7 +29,9 @@ RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 WORKDIR /app
 
 # Copy package files
-COPY package.json pnpm-lock.yaml ./
+# pnpm-workspace.yaml carries the `overrides` block; without it `--frozen-lockfile` fails with
+# ERR_PNPM_LOCKFILE_CONFIG_MISMATCH, because the lockfile records overrides the config lacks.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Install production dependencies only
 RUN pnpm install --frozen-lockfile --prod

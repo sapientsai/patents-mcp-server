@@ -1,9 +1,12 @@
+import { pathToFileURL } from "node:url"
+
 import type { FastMCP } from "fastmcp"
 import { z } from "zod"
 
 import { OdpClient } from "../clients/odp.client"
 import { config } from "../lib/config"
 import { handleApiError } from "../lib/errors"
+import type { TransportType } from "../lib/types"
 import { type FileStore, resourceStore } from "../resources/store"
 
 const ODP_ANNOTATIONS = {
@@ -24,9 +27,23 @@ const createClient = (): OdpClient => {
 }
 
 /**
- * Fetches a file-wrapper PDF from USPTO, stashes it in the transient store, and returns the
- * JSON payload the tool surfaces: a fetchable URL on the server's own host (never the bytes,
- * never the USPTO key). Exported for testing.
+ * Fetches a file-wrapper PDF from USPTO, stashes it in the transient store, and returns a
+ * handle to it — never the bytes, and never the USPTO key.
+ *
+ * Which handle depends on the transport, because only one of them can serve HTTP.
+ *
+ * Under `httpStream` the PDF is fetched from `GET /resources/{uuid}.pdf` on this server, gated
+ * at the edge alongside `/mcp`.
+ *
+ * Under stdio there is no listener at all: `registerResourceRoutes` mounts on an app that never
+ * binds, so a URL would be unreachable by construction. Worse, `PUBLIC_BASE_URL` defaults to the
+ * production host, so the tool used to hand back a perfectly well-formed link to a machine that
+ * had never seen the file — a 404 for every local caller. stdio also means the server is a child
+ * process of its client, so the file is already on the caller's own disk and a path is the
+ * honest handle. The design intent is unchanged either way: the bytes stay out of the model's
+ * context and the caller fetches on demand.
+ *
+ * Exported for testing.
  */
 export const buildDownloadResult = async (
   client: Pick<OdpClient, "downloadDocument">,
@@ -34,13 +51,28 @@ export const buildDownloadResult = async (
   documentIdentifier: string,
   store: FileStore = resourceStore,
   baseUrl: string = config.publicBaseUrl,
+  transport: TransportType = config.transport,
 ): Promise<string> => {
   const { data } = await client.downloadDocument(applicationNumberText, documentIdentifier)
   const { id } = store.put(Buffer.from(data), "pdf")
+
+  if (transport === "httpStream") {
+    return JSON.stringify({
+      url: `${baseUrl}/resources/${id}.pdf`,
+      mimeType: "application/pdf",
+      expiresInSeconds: store.ttlSeconds,
+    })
+  }
+
+  const path = store.getPath(id)
   return JSON.stringify({
-    url: `${baseUrl}/resources/${id}.pdf`,
+    path,
+    url: path === null ? null : pathToFileURL(path).href,
     mimeType: "application/pdf",
     expiresInSeconds: store.ttlSeconds,
+    note:
+      "This server is running over stdio, so it serves no HTTP and the file is on the same machine " +
+      "as you: read it from `path`. It is deleted after expiresInSeconds.",
   })
 }
 
@@ -271,7 +303,7 @@ export const registerOdpTools = (server: FastMCP): void => {
   server.addTool({
     name: "odp-download-document",
     description:
-      "Retrieve the full text and content of any patent file-wrapper document — specifications, claims, drawings, office actions (rejections), applicant amendments and remarks, interview summaries, examiner search notes, and prior-art reference lists. This is the authoritative way to read what a document actually says: fetch the documentIdentifier from odp-get-documents (downloadOptionBag), and this tool downloads it and returns a fetchable URL (JSON of the form { url, mimeType, expiresInSeconds }; fetch the URL to retrieve the PDF, which expires after expiresInSeconds). " +
+      "Retrieve the full text and content of any patent file-wrapper document — specifications, claims, drawings, office actions (rejections), applicant amendments and remarks, interview summaries, examiner search notes, and prior-art reference lists. This is the authoritative way to read what a document actually says: fetch the documentIdentifier from odp-get-documents (downloadOptionBag), and this tool downloads it and returns a handle to the PDF rather than the bytes. Over HTTP that is { url, mimeType, expiresInSeconds } and you fetch the url; over stdio the server serves no HTTP, so it returns { path, url, mimeType, expiresInSeconds, note } where path is a local file on this machine — read it directly. Either way it is deleted after expiresInSeconds. " +
       'Use this whenever a question requires the contents of a prosecution document — e.g. "what was the examiner\'s rejection," "how did the applicant respond," "what prior art was cited." It is also the reliable fallback when the structured office-action endpoints (office-action-get-text/-rejections/-citations) are unavailable or return access errors, since those depend on a separate USPTO data tier. ' +
       "Note: older documents are often scanned images with no embedded text layer. The returned PDF is still complete and readable — the consumer should OCR it (rasterize + text-recognize) when direct text extraction yields nothing.",
     parameters: z.object({

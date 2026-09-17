@@ -126,18 +126,30 @@ const epoRequest = async <T>(path: string, accept = "application/xml"): Promise<
   })
 }
 
-const formatNumber = (number: string, format: EpoNumberFormat = "docdb"): string => {
+/** docdb publication numbers are dotted triples — `EP.1000000.A1`. epodoc numbers are not. */
+const DOCDB_SHAPE = /^[A-Z]{2}\.[^.]+\.[^.]+$/
+
+/**
+ * Infers which OPS number format a string is written in.
+ *
+ * OPS cannot convert between formats on your behalf: the format segment in the URL must match
+ * the shape of the number beside it, or it answers with a misleading error — a docdb path
+ * carrying an epodoc number returns HTTP 413, not a 404.
+ */
+export const detectNumberFormat = (number: string): EpoNumberFormat =>
+  DOCDB_SHAPE.test(number.replace(/\s+/g, "").replace(/[/,]/g, "")) ? "docdb" : "epodoc"
+
+/**
+ * Pairs a number with the format segment that matches it.
+ *
+ * `format` is an override for callers who know better; left undefined, the shape decides. The
+ * default used to be a hard-coded "docdb" while every documented example (`EP1000000`,
+ * `US7650331B1`) is epodoc-shaped, so the common call was always mismatched.
+ */
+const resolveRef = (number: string, format?: EpoNumberFormat): { format: EpoNumberFormat; num: string } => {
+  if (format === "original") return { format: "original", num: number }
   const cleaned = number.replace(/\s+/g, "").replace(/[/,]/g, "")
-  switch (format) {
-    case "docdb":
-      return cleaned
-    case "epodoc":
-      return cleaned
-    case "original":
-      return number
-    default:
-      return cleaned
-  }
+  return { format: format ?? detectNumberFormat(cleaned), num: cleaned }
 }
 
 /**
@@ -162,41 +174,52 @@ export const epoSearchPatents = async (query: string, range?: string): Promise<u
   return epoRequest(`published-data/search?q=${encodeURIComponent(query)}${rangePart}`)
 }
 
-export const epoGetBiblio = async (number: string, format: EpoNumberFormat = "docdb"): Promise<unknown> => {
-  const num = formatNumber(number, format)
-  return epoRequest(`published-data/publication/${format}/${num}/biblio`)
+export const epoGetBiblio = async (number: string, format?: EpoNumberFormat): Promise<unknown> => {
+  const { format: fmt, num } = resolveRef(number, format)
+  return epoRequest(`published-data/publication/${fmt}/${num}/biblio`)
 }
 
-export const epoGetAbstract = async (number: string, format: EpoNumberFormat = "docdb"): Promise<unknown> => {
-  const num = formatNumber(number, format)
-  return epoRequest(`published-data/publication/${format}/${num}/abstract`)
+export const epoGetAbstract = async (number: string, format?: EpoNumberFormat): Promise<unknown> => {
+  const { format: fmt, num } = resolveRef(number, format)
+  return epoRequest(`published-data/publication/${fmt}/${num}/abstract`)
 }
 
-export const epoGetClaims = async (number: string, format: EpoNumberFormat = "docdb"): Promise<unknown> => {
-  const num = formatNumber(number, format)
-  return epoRequest(`published-data/publication/${format}/${num}/claims`)
+export const epoGetClaims = async (number: string, format?: EpoNumberFormat): Promise<unknown> => {
+  const { format: fmt, num } = resolveRef(number, format)
+  return epoRequest(`published-data/publication/${fmt}/${num}/claims`)
 }
 
-export const epoGetDescription = async (number: string, format: EpoNumberFormat = "docdb"): Promise<unknown> => {
-  const num = formatNumber(number, format)
-  return epoRequest(`published-data/publication/${format}/${num}/description`)
+export const epoGetDescription = async (number: string, format?: EpoNumberFormat): Promise<unknown> => {
+  const { format: fmt, num } = resolveRef(number, format)
+  return epoRequest(`published-data/publication/${fmt}/${num}/description`)
 }
 
-export const epoFamilyLookup = async (number: string, format: EpoNumberFormat = "docdb"): Promise<unknown> => {
-  const num = formatNumber(number, format)
-  return epoRequest(`family/publication/${format}/${num}`)
+export const epoFamilyLookup = async (number: string, format?: EpoNumberFormat): Promise<unknown> => {
+  const { format: fmt, num } = resolveRef(number, format)
+  return epoRequest(`family/publication/${fmt}/${num}`)
 }
 
-export const epoLegalStatus = async (number: string, format: EpoNumberFormat = "docdb"): Promise<unknown> => {
-  const num = formatNumber(number, format)
-  return epoRequest(`published-data/publication/${format}/${num}/legal`)
+export const epoLegalStatus = async (number: string, format?: EpoNumberFormat): Promise<unknown> => {
+  const { format: fmt, num } = resolveRef(number, format)
+  return epoRequest(`family/publication/${fmt}/${num}/legal`)
 }
 
+/** What an OPS number refers to. The number service requires this segment in the path. */
+export type EpoReferenceType = "publication" | "application" | "priority"
+
+/**
+ * Converts a number between OPS formats.
+ *
+ * The `referenceType` segment is mandatory: without it OPS matches no route and answers
+ * HTTP 405 ("No resource method found for GET"), which reads like a client bug rather than a
+ * malformed path.
+ */
 export const epoNumberConvert = async (
   number: string,
   inputFormat: EpoNumberFormat,
   outputFormat: EpoNumberFormat,
+  referenceType: EpoReferenceType = "publication",
 ): Promise<unknown> => {
-  const num = formatNumber(number, inputFormat)
-  return epoRequest(`number-service/${inputFormat}/${num}/${outputFormat}`)
+  const num = inputFormat === "original" ? number : number.replace(/\s+/g, "").replace(/[/,]/g, "")
+  return epoRequest(`number-service/${referenceType}/${inputFormat}/${num}/${outputFormat}`)
 }

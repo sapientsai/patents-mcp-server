@@ -15,8 +15,12 @@ import { handleApiError } from "../lib/errors"
 
 const numberFormatSchema = z
   .enum(["docdb", "epodoc", "original"])
-  .default("docdb")
-  .describe("Patent number format: docdb (CC.NNNNNNN.K), epodoc (CCNNNNNNN), or original")
+  .optional()
+  .describe(
+    "Patent number format: docdb (EP.1000000.A1), epodoc (EP1000000), or original. Omit this — " +
+      "the format is inferred from the number's shape. OPS cannot convert between formats, and a " +
+      "format that contradicts the number returns a misleading error rather than a clear one.",
+  )
 
 const readOnlyAnnotations = {
   readOnlyHint: true as const,
@@ -179,11 +183,15 @@ Critical for determining if a patent is still in force in specific jurisdictions
       number: z.string().describe("Patent number to convert"),
       input_format: z.enum(["docdb", "epodoc", "original"]).describe("Input number format"),
       output_format: z.enum(["docdb", "epodoc", "original"]).describe("Desired output format"),
+      reference_type: z
+        .enum(["publication", "application", "priority"])
+        .default("publication")
+        .describe("What the number refers to"),
     }),
     annotations: readOnlyAnnotations,
     execute: async (args) => {
       try {
-        const result = await epoNumberConvert(args.number, args.input_format, args.output_format)
+        const result = await epoNumberConvert(args.number, args.input_format, args.output_format, args.reference_type)
         return JSON.stringify(result, null, 2)
       } catch (error) {
         return handleApiError(error)

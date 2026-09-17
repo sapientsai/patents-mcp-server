@@ -2,7 +2,10 @@
 FROM node:22-alpine AS builder
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
+# The pnpm version comes from package.json's `packageManager` field, which corepack honours.
+# Pinning one here too only creates drift — this pin read 10.32.1 while builds ran 11.27.0.
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable
 
 WORKDIR /app
 
@@ -24,7 +27,10 @@ RUN rm -rf dist && pnpm exec tsdown --outDir dist
 FROM node:22-alpine AS production
 
 # Install pnpm for production deps
-RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
+# The pnpm version comes from package.json's `packageManager` field, which corepack honours.
+# Pinning one here too only creates drift — this pin read 10.32.1 while builds ran 11.27.0.
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable
 
 WORKDIR /app
 

@@ -1,3 +1,9 @@
+# fast-uri 3.1.2 arrives transitively via fastmcp -> ajv, and carries host-confusion and SSRF
+# advisories patched in 3.1.6. ajv asks for ^3.0.1, so staying on the 3.x line satisfies it
+# without a major bump. Drop this once fastmcp's ajv pulls a patched fast-uri itself.
+overrides:
+  fast-uri: "^3.1.8"
+
 publicHoistPattern:
   - "*eslint*"
   - "*prettier*"

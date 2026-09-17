@@ -7,6 +7,7 @@ import {
   epoLegalStatus,
   epoNumberConvert,
   epoSearchPatents,
+  extractKinds,
   projectSearchResults,
 } from "../src/clients/epo-ops.client"
 
@@ -107,6 +108,24 @@ describe("projectSearchResults", () => {
   })
 })
 
+// Pure, so CI runs it without credentials.
+describe("extractKinds", () => {
+  it("lists every kind a number is published under", () => {
+    const biblio = {
+      "world-patent-data": {
+        "exchange-documents": {
+          "exchange-document": [{ "@_kind": "A1" }, { "@_kind": "B1" }],
+        },
+      },
+    }
+    expect(extractKinds(biblio)).toEqual(["A1", "B1"])
+  })
+
+  it("returns an empty list on a malformed response rather than throwing", () => {
+    expect(extractKinds({})).toEqual([])
+  })
+})
+
 const hasCreds = !!(process.env.EPO_CONSUMER_KEY && process.env.EPO_CONSUMER_SECRET)
 
 describe.skipIf(!hasCreds)("EPO OPS (integration)", () => {
@@ -162,15 +181,37 @@ describe.skipIf(!hasCreds)("EPO OPS (integration)", () => {
   })
 
   describe("epoGetClaims", () => {
+    it("serves the GRANTED publication for a kind-less number", async () => {
+      // EP1000000 publishes as both A1 and B1. OPS resolves the ambiguity to A1 silently, which
+      // is the application as filed — 11 claims against the granted 33 — and not enforceable.
+      const result = await epoGetClaims("EP1000000")
+      expect(result.publication).toBe("EP.1000000.B1")
+      expect(result.kind).toBe("B1")
+      expect(result.granted).toBe(true)
+      expect(result.availableKinds).toEqual(expect.arrayContaining(["A1", "B1"]))
+      expect(result.note).toMatch(/granted/i)
+    }, 30000)
+
+    it("honours a kind the caller pinned, without second-guessing it", async () => {
+      const result = await epoGetClaims("EP.1000000.A1", "docdb")
+      expect(result.publication).toBe("EP.1000000.A1")
+      expect(result.kind).toBe("A1")
+      expect(result.granted).toBe(false)
+    }, 30000)
+
+    it("explains the EP/WO coverage limit instead of surfacing InvalidCountryCode", async () => {
+      await expect(epoGetClaims("US7650331B1")).rejects.toThrow(/EP and WO/)
+    }, 30000)
+
     it("resolves an epodoc-shaped number without an explicit format", async () => {
       // Defaulting to docdb while handing OPS an epodoc number produced HTTP 413.
-      const result = (await epoGetClaims("EP1000000")) as Record<string, unknown>
-      expect(JSON.stringify(result)).toContain("claim")
+      const result = await epoGetClaims("EP1000000")
+      expect(JSON.stringify(result.document)).toContain("claim")
     }, 30000)
 
     it("still honours an explicit format when the number matches it", async () => {
-      const result = (await epoGetClaims("EP.1000000.A1", "docdb")) as Record<string, unknown>
-      expect(JSON.stringify(result)).toContain("claim")
+      const result = await epoGetClaims("EP.1000000.A1", "docdb")
+      expect(JSON.stringify(result.document)).toContain("claim")
     }, 30000)
   })
 

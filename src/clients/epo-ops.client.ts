@@ -301,15 +301,118 @@ export const epoGetAbstract = async (number: string, format?: EpoNumberFormat): 
   return epoRequest(`published-data/publication/${fmt}/${num}/abstract`)
 }
 
-export const epoGetClaims = async (number: string, format?: EpoNumberFormat): Promise<unknown> => {
-  const { format: fmt, num } = resolveRef(number, format)
-  return epoRequest(`published-data/publication/${fmt}/${num}/claims`)
+/** OPS kind codes: A* is the application as published, B* is the granted patent. */
+const GRANTED_KIND = /^B/
+
+export type EpoTextResult = {
+  /** The publication actually served, e.g. `EP.1000000.B1`. */
+  publication: string
+  kind?: string
+  /** Every kind OPS publishes under this number, when it was consulted. */
+  availableKinds: string[]
+  granted: boolean
+  note?: string
+  document: unknown
 }
 
-export const epoGetDescription = async (number: string, format?: EpoNumberFormat): Promise<unknown> => {
-  const { format: fmt, num } = resolveRef(number, format)
-  return epoRequest(`published-data/publication/${fmt}/${num}/description`)
+/** Reads the kind codes OPS publishes for a number out of a biblio response. */
+export const extractKinds = (biblio: unknown): string[] => {
+  const documents = asNodes(
+    at(asNode(at(asNode(at(asNode(biblio), "world-patent-data")), "exchange-documents")), "exchange-document"),
+  )
+  return documents.map((d) => asText(at(d, "@_kind"))).filter((k): k is string => k !== undefined)
 }
+
+/** The kind a constituent response says it came from. */
+const servedKind = (document: unknown): string | undefined => {
+  const fulltext = asNodes(
+    at(asNode(at(asNode(at(asNode(document), "world-patent-data")), "fulltext-documents")), "fulltext-document"),
+  )
+  for (const doc of fulltext) {
+    const ref = asNode(at(asNode(at(doc, "bibliographic-data")), "publication-reference"))
+    const kind = asNodes(at(ref, "document-id"))
+      .map((id) => asText(at(id, "kind")))
+      .find((k) => k !== undefined)
+    if (kind !== undefined) return kind
+  }
+  return undefined
+}
+
+/** `EP1000000` + `B1` -> `EP.1000000.B1`. */
+const toDocdb = (epodocNumber: string, kind: string): string | undefined => {
+  const match = /^([A-Z]{2})(.+)$/i.exec(epodocNumber)
+  return match ? `${match[1]}.${match[2]}.${kind}` : undefined
+}
+
+/**
+ * Fetches claims or description, preferring the granted text.
+ *
+ * A bare number is ambiguous — `EP1000000` is published as both A1 and B1 — and OPS resolves
+ * that silently in favour of the A publication. For EP1000000 that is 11 claims as filed rather
+ * than the 33 as granted, and the granted claims are the enforceable ones, so serving the
+ * application text unannounced is a freedom-to-operate hazard.
+ *
+ * When the caller names a kind, that is honoured exactly. When they do not, the available kinds
+ * are looked up and the granted publication is preferred. Either way the result says which
+ * publication it came from, so the choice is never invisible.
+ */
+const fetchText = async (
+  number: string,
+  format: EpoNumberFormat | undefined,
+  constituent: "claims" | "description",
+): Promise<EpoTextResult> => {
+  const { format: fmt, num } = resolveRef(number, format)
+
+  const serve = async (path: string, publication: string, availableKinds: string[], note?: string) => {
+    const document = await epoRequest(`published-data/publication/${path}/${constituent}`).catch((error: unknown) => {
+      // OPS carries full text for EP and WO only. Its own answer is a 404 naming an "unsupported
+      // country code", which reads as a malformed request rather than a coverage boundary.
+      if (error instanceof Error && error.message.includes("InvalidCountryCode")) {
+        throw new Error(
+          `EPO OPS serves ${constituent} text for EP and WO publications only, and ${publication} ` +
+            `is outside that. For a US application use odp-get-documents plus odp-download-document; ` +
+            `epo-get-biblio still works here for titles, applicants and classifications.`,
+        )
+      }
+      throw error
+    })
+    const kind = servedKind(document)
+    return {
+      publication,
+      kind,
+      availableKinds,
+      granted: kind !== undefined && GRANTED_KIND.test(kind),
+      note,
+      document,
+    }
+  }
+
+  // The caller pinned a kind (docdb) or an original-format number: take them at their word.
+  if (fmt !== "epodoc") return serve(`${fmt}/${num}`, num, [])
+
+  const kinds = extractKinds(await epoGetBiblio(num, "epodoc"))
+  const granted = kinds
+    .filter((k) => GRANTED_KIND.test(k))
+    .sort()
+    .pop()
+  const docdb = granted === undefined ? undefined : toDocdb(num, granted)
+
+  if (granted === undefined || docdb === undefined) {
+    return serve(
+      `epodoc/${num}`,
+      num,
+      kinds,
+      kinds.length > 0 ? `No granted publication found; served the application text.` : undefined,
+    )
+  }
+  return serve(`docdb/${docdb}`, docdb, kinds, `Resolved to the granted publication ${granted}.`)
+}
+
+export const epoGetClaims = async (number: string, format?: EpoNumberFormat): Promise<EpoTextResult> =>
+  fetchText(number, format, "claims")
+
+export const epoGetDescription = async (number: string, format?: EpoNumberFormat): Promise<EpoTextResult> =>
+  fetchText(number, format, "description")
 
 export const epoFamilyLookup = async (number: string, format?: EpoNumberFormat): Promise<unknown> => {
   const { format: fmt, num } = resolveRef(number, format)

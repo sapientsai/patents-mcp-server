@@ -101,7 +101,7 @@ Examples:
   server.addTool({
     name: "epo-get-claims",
     description:
-      "Get the full claims text of a patent from EPO OPS. Use this for reading claim language when PPUBS is unavailable.",
+      "Get the claims text of a patent from EPO OPS. Given a number with no kind code, this resolves to the GRANTED publication (B) when one exists, rather than the application as filed (A) — those differ, and the granted claims are the enforceable ones. The result reports which publication it served. Coverage is EP and WO publications only.",
     parameters: z.object({
       number: z.string().describe("Patent number"),
       format: numberFormatSchema,

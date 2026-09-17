@@ -57,6 +57,28 @@ const envIntOrDefault = (key: string, defaultValue: number): number => {
   return isNaN(parsed) ? defaultValue : parsed
 }
 
+/**
+ * The origin `odp-download-document` builds its URLs on, under httpStream.
+ *
+ * This used to default to a specific deployment's hostname, which is wrong in two directions: a
+ * self-hoster who never set it got download links pointing at someone else's server — well-formed
+ * and permanently 404 — and that host travelled inside a published npm package. Falling back to
+ * the address this process actually listens on is at least true of the machine serving the file.
+ *
+ * Anything behind a reverse proxy or a public hostname must still set PUBLIC_BASE_URL explicitly:
+ * a process cannot know the name it is reached by. `index.ts` warns when this fallback is used.
+ */
+const resolvePublicBaseUrl = (): string => {
+  const configured = envOrUndefined("PUBLIC_BASE_URL")
+  if (configured !== undefined) return configured.replace(/\/+$/, "")
+  // An env var set to the empty string is not nullish, so `??` would happily yield `http://:3000`.
+  // Deployment tooling sets blanks routinely — .mcp.json did exactly that for the EPO keys.
+  const host = envOrUndefined("HOST") ?? "0.0.0.0"
+  // 0.0.0.0 means "every interface" when binding, but is not an address you can fetch.
+  const reachable = host === "0.0.0.0" || host === "::" ? "127.0.0.1" : host
+  return `http://${reachable}:${envIntOrDefault("PORT", 8080)}`
+}
+
 const parseTransport = (value: string): TransportType => {
   if (value === "httpStream") return "httpStream"
   return "stdio"
@@ -86,7 +108,7 @@ export const loadConfig = (): AppConfig => ({
   retryMaxWait: envIntOrDefault("RETRY_MAX_WAIT", 10000),
   resourceDir: envOrDefault("RESOURCE_DIR", "/tmp/odp-cache"),
   resourceTtlSeconds: envIntOrDefault("RESOURCE_TTL_SECONDS", 600),
-  publicBaseUrl: envOrDefault("PUBLIC_BASE_URL", "https://patents.civala.ai").replace(/\/+$/, ""),
+  publicBaseUrl: resolvePublicBaseUrl(),
 })
 
 export const getAvailableSources = (cfg: AppConfig): ApiStatus[] => [

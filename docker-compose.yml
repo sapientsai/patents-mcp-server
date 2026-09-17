@@ -10,6 +10,9 @@ services:
     environment:
       - TRANSPORT=httpStream
       - PORT=3000
+      # The origin clients reach this server on — odp-download-document builds its PDF links on
+      # it. Override when running behind a reverse proxy or a public hostname.
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost:3000}
       - USPTO_API_KEY=${USPTO_API_KEY:-}
       - PATENTSVIEW_API_KEY=${PATENTSVIEW_API_KEY:-}
       - EPO_CONSUMER_KEY=${EPO_CONSUMER_KEY:-}

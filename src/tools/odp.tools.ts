@@ -48,18 +48,38 @@ export const registerOdpTools = (server: FastMCP): void => {
   server.addTool({
     name: "odp-search-applications",
     description:
-      "Search USPTO patent applications via the Open Data Portal. Coverage: applications filed January 1, 2001 and later. Supports full-text search across application data.",
+      "Search USPTO patent applications via the Open Data Portal. Coverage: applications filed January 1, 2001 and later. Supports full-text search across application data. Each hit returns a bibliographic summary — number, title, dates, status, applicant, inventor, CPC, art unit, examiner; call odp-get-application for one application's full record.",
     parameters: z.object({
       query: z.string().describe("Search query text"),
       limit: z.number().int().min(1).max(100).default(25).describe("Number of results to return (1-100)"),
       offset: z.number().int().min(0).default(0).describe("Result offset for pagination"),
-      sort: z.string().optional().describe("Sort field and direction"),
+      sortField: z
+        .string()
+        .optional()
+        .describe('Field path to sort by, e.g. "applicationMetaData.filingDate". Omit to use relevance order.'),
+      sortOrder: z
+        .enum(["asc", "desc"])
+        .default("desc")
+        .describe("Sort direction. Applies only when sortField is set."),
+      fields: z
+        .array(z.string())
+        .optional()
+        .describe(
+          "Field paths to return, replacing rather than extending the default bibliographic set (applicationNumberText is always included). Omit unless you need a field the summary leaves out.",
+        ),
     }),
     annotations: ODP_ANNOTATIONS,
     execute: async (args) => {
       try {
         const client = createClient()
-        const result = await client.searchApplications(args.query, args.limit, args.offset, args.sort)
+        const result = await client.searchApplications({
+          query: args.query,
+          limit: args.limit,
+          offset: args.offset,
+          sortField: args.sortField,
+          sortOrder: args.sortOrder,
+          fields: args.fields,
+        })
         return JSON.stringify(result)
       } catch (error) {
         return handleApiError(error)
@@ -88,7 +108,8 @@ export const registerOdpTools = (server: FastMCP): void => {
 
   server.addTool({
     name: "odp-get-application-metadata",
-    description: "Get metadata for a USPTO patent application including application type, entity status, and dates.",
+    description:
+      "Get metadata for a USPTO patent application including application type, entity status, and dates. Prefer this over odp-get-application when you need bibliographic facts rather than the file wrapper: it omits the attorney roster, which makes it dramatically smaller on applications filed by large firms.",
     parameters: z.object({
       applicationNumberText: z.string().describe("Application number (e.g., 16/123,456 or 16123456)"),
     }),

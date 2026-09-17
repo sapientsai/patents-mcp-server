@@ -19,6 +19,38 @@ export const getOdpConfig = (): OdpConfig => {
   }
 }
 
+/**
+ * Field paths `searchApplications` projects when the caller names none: enough to identify,
+ * date, classify and triage a hit, and to look up its full record afterwards. Grant-only paths
+ * (`patentNumber`, `grantDate`) are simply absent on pending applications.
+ */
+export const DEFAULT_SEARCH_FIELDS = [
+  "applicationNumberText",
+  "applicationMetaData.inventionTitle",
+  "applicationMetaData.filingDate",
+  "applicationMetaData.effectiveFilingDate",
+  "applicationMetaData.grantDate",
+  "applicationMetaData.patentNumber",
+  "applicationMetaData.applicationStatusCode",
+  "applicationMetaData.applicationStatusDescriptionText",
+  "applicationMetaData.applicationTypeLabelName",
+  "applicationMetaData.firstApplicantName",
+  "applicationMetaData.firstInventorName",
+  "applicationMetaData.cpcClassificationBag",
+  "applicationMetaData.groupArtUnitNumber",
+  "applicationMetaData.examinerNameText",
+  "applicationMetaData.publicationCategoryBag",
+] as const
+
+export type SearchApplicationsParams = {
+  readonly query: string
+  readonly limit?: number
+  readonly offset?: number
+  readonly sortField?: string
+  readonly sortOrder?: "asc" | "desc"
+  readonly fields?: readonly string[]
+}
+
 export class OdpClient {
   private readonly client: BaseClient
 
@@ -35,7 +67,25 @@ export class OdpClient {
 
   // ── Application Methods ──────────────────────────────────────────────
 
-  async searchApplications(query: string, limit?: number, offset?: number, sort?: string): Promise<unknown> {
+  /**
+   * Searches applications, projecting a bibliographic subset of each matched record.
+   *
+   * The projection is not a size optimisation. ODP inlines `recordAttorney` in full, which
+   * carries the filing firm's entire customer-number roster — 145 practitioners with addresses
+   * and phone numbers, ~172KB, on a single application — so an unprojected three-result search
+   * returns ~225KB and overruns any sane tool-output budget. `odp-get-application` remains the
+   * route to one application's complete record.
+   *
+   * `sort` must be an array of `{ field, order }`; ODP rejects a bare string with HTTP 400.
+   */
+  async searchApplications({
+    query,
+    limit,
+    offset,
+    sortField,
+    sortOrder = "desc",
+    fields = DEFAULT_SEARCH_FIELDS,
+  }: SearchApplicationsParams): Promise<unknown> {
     const body: Record<string, unknown> = { q: query }
     if (limit !== undefined || offset !== undefined) {
       body.pagination = {
@@ -43,7 +93,10 @@ export class OdpClient {
         ...(limit !== undefined ? { limit } : {}),
       }
     }
-    if (sort !== undefined) body.sort = sort
+    if (sortField !== undefined) body.sort = [{ field: sortField, order: sortOrder }]
+    // A hit without its application number cannot be followed up, so project it even when the
+    // caller supplies their own field list.
+    body.fields = fields.includes("applicationNumberText") ? [...fields] : ["applicationNumberText", ...fields]
     return this.client.post("patent/applications/search", body)
   }
 
@@ -52,7 +105,7 @@ export class OdpClient {
   }
 
   async getApplicationMetadata(appNum: string): Promise<unknown> {
-    return this.client.get(`patent/applications/${normalizePatentNumber(appNum)}/metadata`)
+    return this.client.get(`patent/applications/${normalizePatentNumber(appNum)}/meta-data`)
   }
 
   async getContinuity(appNum: string): Promise<unknown> {

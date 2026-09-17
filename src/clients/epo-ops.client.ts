@@ -233,6 +233,19 @@ const extractApplicants = (bibliographicData: Node | undefined): string[] =>
     .map((a) => asText(at(asNode(at(a, "applicant-name")), "name")))
     .filter((n): n is string => n !== undefined)
 
+/** A value that may be a single item or a list, rendered as a list of strings. */
+const asTexts = (value: unknown): string[] =>
+  (Array.isArray(value) ? value : [value])
+    .map((v) => asText(v) ?? asText(at(asNode(v), "#text")))
+    .filter((t): t is string => t !== undefined && t.trim() !== "")
+
+/** OPS publishes EP text in de/en/fr. Prefer English, else take whatever came first. */
+const pickLanguageBlock = (blocks: Node[]): Node | undefined =>
+  blocks.find((b) => asText(at(b, "@_lang"))?.toUpperCase() === "EN") ?? blocks[0]
+
+const languagesOf = (blocks: Node[]): string[] =>
+  blocks.map((b) => asText(at(b, "@_lang"))?.toUpperCase()).filter((l): l is string => l !== undefined)
+
 /** Prefers the English title; OPS returns one entry per language, in no guaranteed order. */
 const pickTitle = (titles: unknown): string | undefined => {
   const list = asNodes(titles)
@@ -385,9 +398,22 @@ export const epoGetBiblio = async (number: string, format?: EpoNumberFormat): Pr
   return projectBiblio(await epoRequest(`published-data/publication/${fmt}/${num}/biblio`))
 }
 
-export const epoGetAbstract = async (number: string, format?: EpoNumberFormat): Promise<unknown> => {
+export type EpoAbstract = {
+  publications: Array<{ publicationNumber: string; kind?: string; text?: string }>
+}
+
+/** Flattens an OPS abstract response. Exported for testing. */
+export const projectAbstract = (parsed: unknown): EpoAbstract => ({
+  publications: projectBiblio(parsed).publications.map((publication) => ({
+    publicationNumber: publication.publicationNumber,
+    kind: publication.kind,
+    text: publication.abstract,
+  })),
+})
+
+export const epoGetAbstract = async (number: string, format?: EpoNumberFormat): Promise<EpoAbstract> => {
   const { format: fmt, num } = resolveRef(number, format)
-  return epoRequest(`published-data/publication/${fmt}/${num}/abstract`)
+  return projectAbstract(await epoRequest(`published-data/publication/${fmt}/${num}/abstract`))
 }
 
 /** OPS kind codes: A* is the application as published, B* is the granted patent. */
@@ -401,7 +427,42 @@ export type EpoTextResult = {
   availableKinds: string[]
   granted: boolean
   note?: string
-  document: unknown
+  /** The language the text below is in. */
+  language?: string
+  availableLanguages: string[]
+  /** One entry per claim, or per description paragraph. */
+  text: string[]
+}
+
+/**
+ * Pulls claim or description text out of a fulltext response.
+ *
+ * OPS nests the text under a language block per translation, then under `claim`/`p` nodes whose
+ * values are themselves either strings or lists. Returning that tree verbatim left every
+ * consumer to walk it; these tools exist to deliver text.
+ *
+ * Exported for testing.
+ */
+export const projectFulltext = (
+  document: unknown,
+  constituent: "claims" | "description",
+): { language?: string; availableLanguages: string[]; text: string[] } => {
+  const fulltext = asNodes(
+    at(asNode(at(asNode(at(asNode(document), "world-patent-data")), "fulltext-documents")), "fulltext-document"),
+  )
+  const blocks = fulltext.flatMap((doc) => asNodes(at(doc, constituent)))
+  const chosen = pickLanguageBlock(blocks)
+
+  const text =
+    constituent === "claims"
+      ? asNodes(at(chosen, "claim")).flatMap((claim) => asTexts(at(claim, "claim-text")))
+      : asTexts(at(chosen, "p"))
+
+  return {
+    language: asText(at(chosen, "@_lang"))?.toUpperCase(),
+    availableLanguages: languagesOf(blocks),
+    text,
+  }
 }
 
 /** The kind a constituent response says it came from. */
@@ -464,7 +525,7 @@ const fetchText = async (
       availableKinds,
       granted: kind !== undefined && GRANTED_KIND.test(kind),
       note,
-      document,
+      ...projectFulltext(document, constituent),
     }
   }
 

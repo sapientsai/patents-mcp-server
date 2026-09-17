@@ -8,8 +8,10 @@ import {
   epoNumberConvert,
   epoSearchPatents,
   epoFamilyLookup,
+  projectAbstract,
   projectBiblio,
   projectFamily,
+  projectFulltext,
   projectLegalStatus,
   projectNumberConversion,
   projectSearchResults,
@@ -380,6 +382,85 @@ describe("projectNumberConversion", () => {
   })
 })
 
+// Pure, so CI runs it without credentials.
+describe("projectFulltext", () => {
+  const fulltext = (constituent: string, blocks: unknown) => ({
+    "world-patent-data": { "fulltext-documents": { "fulltext-document": { [constituent]: blocks } } },
+  })
+
+  it("returns one string per claim", () => {
+    const doc = fulltext("claims", [
+      {
+        "@_lang": "EN",
+        claim: [{ "claim-text": "1. An apparatus." }, { "claim-text": "2. The apparatus of claim 1." }],
+      },
+    ])
+    const { text } = projectFulltext(doc, "claims")
+    expect(text).toEqual(["1. An apparatus.", "2. The apparatus of claim 1."])
+  })
+
+  it("prefers English when OPS publishes several translations", () => {
+    // EP grants carry de/fr/en; returning whichever came first is a coin toss.
+    const doc = fulltext("claims", [
+      { "@_lang": "DE", claim: [{ "claim-text": "1. Vorrichtung." }] },
+      { "@_lang": "EN", claim: [{ "claim-text": "1. Apparatus." }] },
+    ])
+    const result = projectFulltext(doc, "claims")
+    expect(result.language).toBe("EN")
+    expect(result.text).toEqual(["1. Apparatus."])
+    expect(result.availableLanguages).toEqual(["DE", "EN"])
+  })
+
+  it("falls back to the only language available", () => {
+    const doc = fulltext("claims", [{ "@_lang": "DE", claim: [{ "claim-text": "1. Vorrichtung." }] }])
+    expect(projectFulltext(doc, "claims").language).toBe("DE")
+  })
+
+  it("flattens a claim whose text OPS split across several nodes", () => {
+    const doc = fulltext("claims", [
+      { "@_lang": "EN", claim: [{ "claim-text": ["1. An apparatus", "comprising a conveyor."] }] },
+    ])
+    expect(projectFulltext(doc, "claims").text).toHaveLength(2)
+  })
+
+  it("returns description paragraphs", () => {
+    const doc = fulltext("description", { "@_lang": "en", p: ["[0001] First.", "[0002] Second."] })
+    expect(projectFulltext(doc, "description").text).toEqual(["[0001] First.", "[0002] Second."])
+  })
+
+  it("returns no text rather than throwing on a malformed response", () => {
+    expect(projectFulltext({}, "claims")).toEqual({ language: undefined, availableLanguages: [], text: [] })
+  })
+})
+
+// Pure, so CI runs it without credentials.
+describe("projectAbstract", () => {
+  it("returns the abstract text per publication", () => {
+    const parsed = {
+      "world-patent-data": {
+        "exchange-documents": {
+          "exchange-document": [
+            {
+              "@_kind": "A1",
+              "bibliographic-data": {
+                "publication-reference": {
+                  "document-id": [{ "doc-number": "EP1000000", "@_document-id-type": "epodoc" }],
+                },
+              },
+              abstract: { "@_lang": "en", p: { "#text": "An apparatus for manufacturing green bricks." } },
+            },
+          ],
+        },
+      },
+    }
+    expect(projectAbstract(parsed).publications[0]).toMatchObject({
+      publicationNumber: "EP1000000",
+      kind: "A1",
+      text: "An apparatus for manufacturing green bricks.",
+    })
+  })
+})
+
 const hasCreds = !!(process.env.EPO_CONSUMER_KEY && process.env.EPO_CONSUMER_SECRET)
 
 describe.skipIf(!hasCreds)("EPO OPS (integration)", () => {
@@ -468,12 +549,14 @@ describe.skipIf(!hasCreds)("EPO OPS (integration)", () => {
     it("resolves an epodoc-shaped number without an explicit format", async () => {
       // Defaulting to docdb while handing OPS an epodoc number produced HTTP 413.
       const result = await epoGetClaims("EP1000000")
-      expect(JSON.stringify(result.document)).toContain("claim")
+      expect(result.text.length).toBeGreaterThan(0)
+      expect(result.text[0]).toMatch(/^1\./)
     }, 30000)
 
     it("still honours an explicit format when the number matches it", async () => {
       const result = await epoGetClaims("EP.1000000.A1", "docdb")
-      expect(JSON.stringify(result.document)).toContain("claim")
+      expect(result.text.length).toBeGreaterThan(0)
+      expect(result.text[0]).toMatch(/^1\./)
     }, 30000)
   })
 

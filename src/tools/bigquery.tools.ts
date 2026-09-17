@@ -68,7 +68,7 @@ Complements epo-family-lookup with BigQuery's comprehensive dataset.`,
   server.addTool({
     name: "bigquery-citation-network",
     description: `Build a citation graph for a patent from Google Patents BigQuery.
-Returns all patents cited by the given patent (depth=1) or citations-of-citations (depth=2).
+Returns all patents cited by the given patent (depth=1) or the citations of those citations (depth=2).
 Publication numbers in DOCDB format (e.g., US-7650331-B1).
 Useful for prior art analysis and understanding technology lineage.`,
     parameters: z.object({
@@ -78,7 +78,7 @@ Useful for prior art analysis and understanding technology lineage.`,
         .min(1)
         .max(2)
         .default(1)
-        .describe("Citation depth: 1 for direct citations, 2 for citations-of-citations"),
+        .describe("Citation depth: 1 for direct citations, 2 to also include the citations of those citations"),
     }),
     annotations: readOnlyAnnotations,
     execute: async (args) => {

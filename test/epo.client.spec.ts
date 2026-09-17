@@ -7,7 +7,9 @@ import {
   epoLegalStatus,
   epoNumberConvert,
   epoSearchPatents,
+  epoFamilyLookup,
   extractKinds,
+  projectFamily,
   projectSearchResults,
 } from "../src/clients/epo-ops.client"
 
@@ -126,6 +128,76 @@ describe("extractKinds", () => {
   })
 })
 
+// Pure, so CI runs it without credentials.
+describe("projectFamily", () => {
+  const response = {
+    "world-patent-data": {
+      "patent-family": {
+        "@_total-result-count": "2",
+        "@_legal": "false",
+        "family-member": [
+          {
+            "@_family-id": "19768124",
+            "publication-reference": {
+              "document-id": [
+                { country: "EP", "doc-number": 1000000, kind: "B1", date: 20030212, "@_document-id-type": "docdb" },
+                { "doc-number": "EP1000000", date: 20030212, "@_document-id-type": "epodoc" },
+              ],
+            },
+            "exchange-document": {
+              "bibliographic-data": {
+                "invention-title": [{ "#text": "Apparatus for manufacturing green bricks", "@_lang": "en" }],
+                parties: {
+                  applicants: { applicant: [{ "applicant-name": { name: "DE BOER BV" }, "@_data-format": "epodoc" }] },
+                },
+              },
+            },
+          },
+          {
+            "publication-reference": {
+              "document-id": [
+                { country: "US", "doc-number": 6093011, kind: "A", date: 20000725, "@_document-id-type": "docdb" },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  }
+
+  it("maps each member to its jurisdiction and publication", () => {
+    const family = projectFamily(response)
+    expect(family.total).toBe(2)
+    expect(family.members[0]).toMatchObject({
+      country: "EP",
+      publicationNumber: "EP1000000",
+      kind: "B1",
+      publicationDate: "20030212",
+      title: "Apparatus for manufacturing green bricks",
+      applicants: ["DE BOER BV"],
+    })
+  })
+
+  it("lists distinct jurisdictions, which is the coverage question", () => {
+    expect(projectFamily(response).jurisdictions).toEqual(["EP", "US"])
+  })
+
+  it("reports that it carries no legal status, and says so in the note", () => {
+    // A member list reads as a coverage map; a lapsed member looks identical to a live one.
+    const family = projectFamily(response)
+    expect(family.carriesLegalStatus).toBe(false)
+    expect(family.note).toMatch(/epo-legal-status/)
+  })
+
+  it("keeps a member that has no biblio constituent", () => {
+    expect(projectFamily(response).members[1]).toMatchObject({ country: "US", publicationNumber: "US6093011" })
+  })
+
+  it("returns an empty family rather than throwing on a malformed response", () => {
+    expect(projectFamily({}).members).toEqual([])
+  })
+})
+
 const hasCreds = !!(process.env.EPO_CONSUMER_KEY && process.env.EPO_CONSUMER_SECRET)
 
 describe.skipIf(!hasCreds)("EPO OPS (integration)", () => {
@@ -149,6 +221,17 @@ describe.skipIf(!hasCreds)("EPO OPS (integration)", () => {
         members.map((m: any) => m["publication-reference"]?.["document-id"]?.[0]?.country).filter(Boolean),
       )
       expect(countries.size).toBeGreaterThan(1)
+    }, 30000)
+  })
+
+  describe("epoFamilyLookup", () => {
+    it("returns members carrying jurisdiction and title, not bare numbers", async () => {
+      const family = await epoFamilyLookup("EP1000000")
+      expect(family.total).toBeGreaterThan(1)
+      expect(family.jurisdictions.length).toBeGreaterThan(1)
+      expect(family.members.some((m) => m.title !== undefined)).toBe(true)
+      // OPS itself reports this constituent carries no legal events.
+      expect(family.carriesLegalStatus).toBe(false)
     }, 30000)
   })
 

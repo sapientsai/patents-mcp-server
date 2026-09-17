@@ -138,11 +138,14 @@ Examples:
 
   server.addTool({
     name: "epo-family-lookup",
-    description: `Look up INPADOC patent family members for a given patent. Returns all global family members
-showing every jurisdiction where the invention has patent protection.
+    description: `Look up INPADOC patent family members for a given patent. Returns every family member with its
+jurisdiction, publication number, kind, date, title and applicants, plus the distinct list of
+jurisdictions.
 
-This is the highest-value EPO tool for FTO work — maps all family members across jurisdictions.
-Critical for licensing, acquisition due diligence, and understanding worldwide patent coverage.`,
+This maps where protection was SOUGHT. It carries no legal status, so it does not tell you where
+a patent is still in force — a lapsed member looks identical to a live one here. Call
+epo-legal-status for grant, lapse and opposition events per member before relying on this for
+freedom-to-operate or due diligence.`,
     parameters: z.object({
       number: z.string().describe("Patent number to look up family for"),
       format: numberFormatSchema,

@@ -223,6 +223,16 @@ const asText = (value: unknown): string | undefined =>
 
 const at = (node: Node | undefined, key: string): unknown => node?.[key]
 
+/**
+ * Applicants in their epodoc rendering. OPS lists every party twice — once epodoc, once in the
+ * original script — and the duplicate doubles the list without adding information.
+ */
+const extractApplicants = (bibliographicData: Node | undefined): string[] =>
+  asNodes(at(asNode(at(asNode(at(bibliographicData, "parties")), "applicants")), "applicant"))
+    .filter((a) => a["@_data-format"] !== "original")
+    .map((a) => asText(at(asNode(at(a, "applicant-name")), "name")))
+    .filter((n): n is string => n !== undefined)
+
 /** Prefers the English title; OPS returns one entry per language, in no guaranteed order. */
 const pickTitle = (titles: unknown): string | undefined => {
   const list = asNodes(titles)
@@ -258,12 +268,7 @@ export const projectSearchResults = (parsed: unknown): EpoSearchResults => {
         (docdb ? `${asText(at(docdb, "country")) ?? ""}${asText(at(docdb, "doc-number")) ?? ""}` : undefined) ??
         `${asText(at(doc, "@_country")) ?? ""}${asText(at(doc, "@_doc-number")) ?? ""}`
 
-      // Keep the epodoc rendering of each applicant: the `original` duplicate is the same party
-      // in its native script, which doubles the list without adding information.
-      const applicants = asNodes(at(asNode(at(asNode(at(bib, "parties")), "applicants")), "applicant"))
-        .filter((a) => a["@_data-format"] !== "original")
-        .map((a) => asText(at(asNode(at(a, "applicant-name")), "name")))
-        .filter((n): n is string => n !== undefined)
+      const applicants = extractApplicants(bib)
 
       return {
         publicationNumber,
@@ -414,9 +419,82 @@ export const epoGetClaims = async (number: string, format?: EpoNumberFormat): Pr
 export const epoGetDescription = async (number: string, format?: EpoNumberFormat): Promise<EpoTextResult> =>
   fetchText(number, format, "description")
 
-export const epoFamilyLookup = async (number: string, format?: EpoNumberFormat): Promise<unknown> => {
+export type EpoFamilyMember = {
+  country?: string
+  publicationNumber: string
+  kind?: string
+  publicationDate?: string
+  title?: string
+  applicants: string[]
+  familyId?: string
+}
+
+export type EpoFamily = {
+  total: number
+  /** Distinct country codes across the family — the coverage map an FTO question asks for. */
+  jurisdictions: string[]
+  /** OPS reports whether the response carries legal events. This constituent never does. */
+  carriesLegalStatus: boolean
+  note: string
+  members: EpoFamilyMember[]
+}
+
+/**
+ * Reduces an INPADOC family response to one line per member.
+ *
+ * Exported for testing.
+ */
+export const projectFamily = (parsed: unknown): EpoFamily => {
+  const family = asNode(at(asNode(at(asNode(parsed), "world-patent-data")), "patent-family"))
+  const total = Number(asText(at(family, "@_total-result-count")) ?? 0)
+  const carriesLegalStatus = asText(at(family, "@_legal")) === "true"
+
+  const members: EpoFamilyMember[] = asNodes(at(family, "family-member")).map((member) => {
+    const ids = asNodes(at(asNode(at(member, "publication-reference")), "document-id"))
+    const byType = (type: string) => ids.find((d) => d["@_document-id-type"] === type)
+    const docdb = byType("docdb")
+    const epodoc = byType("epodoc")
+    const exchange = asNodes(at(member, "exchange-document"))[0]
+    const bib = asNode(at(exchange, "bibliographic-data"))
+
+    return {
+      country: asText(at(docdb, "country")),
+      publicationNumber:
+        asText(at(epodoc, "doc-number")) ??
+        `${asText(at(docdb, "country")) ?? ""}${asText(at(docdb, "doc-number")) ?? ""}`,
+      kind: asText(at(docdb, "kind")),
+      publicationDate: asText(at(docdb, "date")) ?? asText(at(epodoc, "date")),
+      title: pickTitle(at(bib, "invention-title")),
+      applicants: extractApplicants(bib),
+      familyId: asText(at(member, "@_family-id")),
+    }
+  })
+
+  const jurisdictions = [...new Set(members.map((m) => m.country).filter((c): c is string => c !== undefined))].sort()
+
+  return {
+    total,
+    jurisdictions,
+    carriesLegalStatus,
+    note: "Family membership only — this says where protection was SOUGHT, not where it is in force. Call epo-legal-status for grant, lapse and opposition events per member.",
+    members,
+  }
+}
+
+/**
+ * Looks up the INPADOC family, as a coverage map.
+ *
+ * Uses the `biblio` constituent rather than the bare family endpoint: without it each member is
+ * a publication number and nothing else, so reading a family meant one call per member. The
+ * result is projected, since the raw constituent runs ~66KB.
+ *
+ * It carries no legal events — OPS says so itself via `@_legal="false"` — and a member list
+ * reads far too easily as a coverage map of what is still in force. Both the flag and the note
+ * are surfaced so that inference is not left to the caller.
+ */
+export const epoFamilyLookup = async (number: string, format?: EpoNumberFormat): Promise<EpoFamily> => {
   const { format: fmt, num } = resolveRef(number, format)
-  return epoRequest(`family/publication/${fmt}/${num}`)
+  return projectFamily(await epoRequest(`family/publication/${fmt}/${num}/biblio`))
 }
 
 export const epoLegalStatus = async (number: string, format?: EpoNumberFormat): Promise<unknown> => {

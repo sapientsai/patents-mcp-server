@@ -1,11 +1,41 @@
 import { describe, expect, it } from "vitest"
 
-import { DEFAULT_SEARCH_FIELDS, OdpClient } from "../src/clients/odp.client"
+import { buildOdpQuery, DEFAULT_SEARCH_FIELDS, OdpClient } from "../src/clients/odp.client"
 
 // Pure, so it runs in CI where no credentials are present — unlike everything below it.
 describe("DEFAULT_SEARCH_FIELDS", () => {
   it("always projects the application number", () => {
     expect(DEFAULT_SEARCH_FIELDS).toContain("applicationNumberText")
+  })
+})
+
+// Pure, so CI runs it without credentials.
+describe("buildOdpQuery", () => {
+  it("ANDs bare terms, because ODP ORs them and that matches most of the database", () => {
+    // 972,623 hits ORed against 239 ANDed, on the same four terms.
+    expect(buildOdpQuery("quantum computing error correction")).toBe("quantum AND computing AND error AND correction")
+  })
+
+  it("leaves a single term alone", () => {
+    expect(buildOdpQuery("metarrestin")).toBe("metarrestin")
+  })
+
+  it.each([
+    ['"quantum error correction"', "quoted phrase"],
+    ["(quantum OR qubit) AND error", "grouping and operators"],
+    ["applicationMetaData.inventionTitle:(quantum AND error)", "field scoping"],
+    ["quantum NOT laser", "negation"],
+  ])("never rewrites %s (%s)", (query) => {
+    expect(buildOdpQuery(query, "all")).toBe(query)
+  })
+
+  it.each(["any", "raw"] as const)("passes through verbatim in mode %s", (mode) => {
+    const q = "quantum computing error correction"
+    expect(buildOdpQuery(q, mode)).toBe(q)
+  })
+
+  it("collapses irregular whitespace", () => {
+    expect(buildOdpQuery("  quantum   error  ")).toBe("quantum AND error")
   })
 })
 

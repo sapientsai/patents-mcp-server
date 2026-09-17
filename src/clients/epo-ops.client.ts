@@ -182,9 +182,113 @@ export const epoHealthCheck = async (): Promise<{ healthy: boolean; error?: stri
   }
 }
 
-export const epoSearchPatents = async (query: string, range?: string): Promise<unknown> => {
+export type EpoSearchHit = {
+  publicationNumber: string
+  kind?: string
+  title?: string
+  applicants: string[]
+  publicationDate?: string
+  familyId?: string
+}
+
+export type EpoSearchResults = {
+  total: number
+  returned: number
+  hits: EpoSearchHit[]
+}
+
+/** OPS XML parses to loosely-shaped nodes; these narrow it without reaching for `any`. */
+type Node = Readonly<Record<string, unknown>>
+
+const asNode = (value: unknown): Node | undefined =>
+  typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Node) : undefined
+
+/** fast-xml-parser collapses single-element lists to the element itself. */
+const asNodes = (value: unknown): Node[] => {
+  if (Array.isArray(value)) {
+    const nodes: Node[] = []
+    for (const entry of value) {
+      const node = asNode(entry)
+      if (node !== undefined) nodes.push(node)
+    }
+    return nodes
+  }
+  const single = asNode(value)
+  return single === undefined ? [] : [single]
+}
+
+/** Doc numbers and dates arrive as either strings or numbers depending on the field. */
+const asText = (value: unknown): string | undefined =>
+  typeof value === "string" ? value : typeof value === "number" ? String(value) : undefined
+
+const at = (node: Node | undefined, key: string): unknown => node?.[key]
+
+/** Prefers the English title; OPS returns one entry per language, in no guaranteed order. */
+const pickTitle = (titles: unknown): string | undefined => {
+  const list = asNodes(titles)
+  const chosen = list.find((t) => t["@_lang"] === "en") ?? list[0]
+  return asText(at(chosen, "#text"))
+}
+
+/**
+ * Reduces an OPS biblio-search response to one line per hit.
+ *
+ * `search/biblio` embeds each hit's complete bibliographic record — classifications, priority
+ * claims, every title translation — which runs ~15KB per hit, so five results cost 74KB. The
+ * fields kept here are the ones that let a caller triage a hit list and decide what to fetch
+ * in full; `epo-get-biblio` remains the route to one publication's complete record.
+ *
+ * Exported for testing.
+ */
+export const projectSearchResults = (parsed: unknown): EpoSearchResults => {
+  const search = asNode(at(asNode(at(asNode(parsed), "world-patent-data")), "biblio-search"))
+  const total = Number(asText(at(search, "@_total-result-count")) ?? 0)
+  const documents = asNodes(at(asNode(at(search, "search-result")), "exchange-documents"))
+
+  const hits: EpoSearchHit[] = documents.flatMap((wrapper) =>
+    asNodes(at(wrapper, "exchange-document")).map((doc) => {
+      const bib = asNode(at(doc, "bibliographic-data"))
+      const ids = asNodes(at(asNode(at(bib, "publication-reference")), "document-id"))
+      const byType = (type: string) => ids.find((d) => d["@_document-id-type"] === type)
+      const epodoc = byType("epodoc")
+      const docdb = byType("docdb")
+
+      const publicationNumber =
+        asText(at(epodoc, "doc-number")) ??
+        (docdb ? `${asText(at(docdb, "country")) ?? ""}${asText(at(docdb, "doc-number")) ?? ""}` : undefined) ??
+        `${asText(at(doc, "@_country")) ?? ""}${asText(at(doc, "@_doc-number")) ?? ""}`
+
+      // Keep the epodoc rendering of each applicant: the `original` duplicate is the same party
+      // in its native script, which doubles the list without adding information.
+      const applicants = asNodes(at(asNode(at(asNode(at(bib, "parties")), "applicants")), "applicant"))
+        .filter((a) => a["@_data-format"] !== "original")
+        .map((a) => asText(at(asNode(at(a, "applicant-name")), "name")))
+        .filter((n): n is string => n !== undefined)
+
+      return {
+        publicationNumber,
+        kind: asText(at(doc, "@_kind")),
+        title: pickTitle(at(bib, "invention-title")),
+        applicants,
+        publicationDate: asText(at(epodoc, "date")) ?? asText(at(docdb, "date")),
+        familyId: asText(at(doc, "@_family-id")),
+      }
+    }),
+  )
+
+  return { total, returned: hits.length, hits }
+}
+
+/**
+ * Searches OPS and returns a triage-sized hit list.
+ *
+ * Uses the `biblio` constituent rather than bare `search`: the bare endpoint returns publication
+ * numbers and family ids only, so identifying a hit list meant one follow-up call per hit.
+ */
+export const epoSearchPatents = async (query: string, range?: string): Promise<EpoSearchResults> => {
   const rangePart = range ? `&Range=${range}` : ""
-  return epoRequest(`published-data/search?q=${encodeURIComponent(query)}${rangePart}`)
+  const parsed = await epoRequest(`published-data/search/biblio?q=${encodeURIComponent(query)}${rangePart}`)
+  return projectSearchResults(parsed)
 }
 
 export const epoGetBiblio = async (number: string, format?: EpoNumberFormat): Promise<unknown> => {

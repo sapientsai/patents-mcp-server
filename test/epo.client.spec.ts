@@ -6,6 +6,8 @@ import {
   epoGetClaims,
   epoLegalStatus,
   epoNumberConvert,
+  epoSearchPatents,
+  projectSearchResults,
 } from "../src/clients/epo-ops.client"
 
 describe("detectNumberFormat", () => {
@@ -24,6 +26,84 @@ describe("detectNumberFormat", () => {
     ["EP 1000000", "epodoc"], // whitespace is stripped before matching
   ])("reads %s as %s", (number, expected) => {
     expect(detectNumberFormat(number)).toBe(expected)
+  })
+})
+
+// Pure, so CI runs it without credentials.
+describe("projectSearchResults", () => {
+  const response = {
+    "world-patent-data": {
+      "biblio-search": {
+        "@_total-result-count": "981",
+        "search-result": {
+          "exchange-documents": [
+            {
+              "exchange-document": [
+                {
+                  "@_country": "WO",
+                  "@_doc-number": "2026184726",
+                  "@_kind": "A1",
+                  "@_family-id": "101217036",
+                  "bibliographic-data": {
+                    "publication-reference": {
+                      "document-id": [
+                        {
+                          country: "WO",
+                          "doc-number": 2026184726,
+                          kind: "A1",
+                          date: 20260910,
+                          "@_document-id-type": "docdb",
+                        },
+                        { "doc-number": "WO2026184726", date: 20260910, "@_document-id-type": "epodoc" },
+                      ],
+                    },
+                    parties: {
+                      applicants: {
+                        applicant: [
+                          { "applicant-name": { name: "WUXI XDC SHANGHAI CO LTD [CN]" }, "@_data-format": "epodoc" },
+                          { "applicant-name": { name: "上海药明合联生物技术有限公司" }, "@_data-format": "original" },
+                        ],
+                      },
+                    },
+                    "invention-title": [
+                      { "#text": "CONJUGUÉ ANTICORPS-MÉDICAMENT", "@_lang": "fr" },
+                      { "#text": "ANTIBODY-DRUG CONJUGATE CONTAINING HYDROPHILIC GROUP", "@_lang": "en" },
+                    ],
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    },
+  }
+
+  it("projects the fields needed to triage a hit", () => {
+    const { total, returned, hits } = projectSearchResults(response)
+    expect(total).toBe(981)
+    expect(returned).toBe(1)
+    expect(hits[0]).toEqual({
+      publicationNumber: "WO2026184726",
+      kind: "A1",
+      title: "ANTIBODY-DRUG CONJUGATE CONTAINING HYDROPHILIC GROUP",
+      applicants: ["WUXI XDC SHANGHAI CO LTD [CN]"],
+      publicationDate: "20260910",
+      familyId: "101217036",
+    })
+  })
+
+  it("prefers the English title over other translations", () => {
+    expect(projectSearchResults(response).hits[0].title).not.toContain("CONJUGUÉ")
+  })
+
+  it("drops the original-script duplicate of each applicant", () => {
+    // OPS lists every party twice, epodoc and original; the second adds no information.
+    expect(projectSearchResults(response).hits[0].applicants).toHaveLength(1)
+  })
+
+  it("returns an empty list rather than throwing on a malformed response", () => {
+    expect(projectSearchResults({})).toEqual({ total: 0, returned: 0, hits: [] })
   })
 })
 
@@ -50,6 +130,21 @@ describe.skipIf(!hasCreds)("EPO OPS (integration)", () => {
         members.map((m: any) => m["publication-reference"]?.["document-id"]?.[0]?.country).filter(Boolean),
       )
       expect(countries.size).toBeGreaterThan(1)
+    }, 30000)
+  })
+
+  describe("epoSearchPatents", () => {
+    it("returns hits carrying titles and applicants, not bare publication numbers", async () => {
+      // The bare `search` endpoint returns document-id and family-id only, which forced one
+      // epo-get-biblio call per hit just to identify a result list.
+      const { total, hits } = await epoSearchPatents('ti="antibody drug conjugate"', "1-5")
+      expect(total).toBeGreaterThan(0)
+      expect(hits.length).toBeGreaterThan(0)
+      for (const h of hits) {
+        expect(h.publicationNumber).toMatch(/^[A-Z]{2}\d+/)
+        expect(h.title).toBeTruthy()
+      }
+      expect(hits.some((h) => h.applicants.length > 0)).toBe(true)
     }, 30000)
   })
 

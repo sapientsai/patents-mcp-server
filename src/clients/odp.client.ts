@@ -42,6 +42,32 @@ export const DEFAULT_SEARCH_FIELDS = [
   "applicationMetaData.publicationCategoryBag",
 ] as const
 
+/**
+ * How a bare, multi-word query is combined.
+ *
+ * ODP ORs bare terms, which is the opposite of what every search engine trains callers to
+ * expect: `quantum computing error correction` matches 972,623 applications and ranks junk
+ * first, while the same terms ANDed match 239. `all` is therefore the default.
+ */
+export type OdpQueryMode = "all" | "any" | "raw"
+
+/** Quotes, grouping, field scoping or boolean operators — syntax the caller wrote deliberately. */
+const STRUCTURED_QUERY = /["():]|\b(?:AND|OR|NOT)\b/
+
+/**
+ * Builds the `q` ODP receives.
+ *
+ * A query the caller has already structured is never rewritten, whatever the mode — rewriting
+ * `(quantum OR qubit) AND error` would corrupt it. Only bare whitespace-separated terms are
+ * joined, so the transformation is both predictable and inspectable.
+ */
+export const buildOdpQuery = (query: string, mode: OdpQueryMode = "all"): string => {
+  const trimmed = query.trim()
+  if (mode !== "all" || STRUCTURED_QUERY.test(trimmed)) return trimmed
+  const terms = trimmed.split(/\s+/).filter(Boolean)
+  return terms.length > 1 ? terms.join(" AND ") : trimmed
+}
+
 export type SearchApplicationsParams = {
   readonly query: string
   readonly limit?: number
@@ -49,6 +75,7 @@ export type SearchApplicationsParams = {
   readonly sortField?: string
   readonly sortOrder?: "asc" | "desc"
   readonly fields?: readonly string[]
+  readonly mode?: OdpQueryMode
 }
 
 export class OdpClient {
@@ -85,8 +112,9 @@ export class OdpClient {
     sortField,
     sortOrder = "desc",
     fields = DEFAULT_SEARCH_FIELDS,
+    mode = "all",
   }: SearchApplicationsParams): Promise<unknown> {
-    const body: Record<string, unknown> = { q: query }
+    const body: Record<string, unknown> = { q: buildOdpQuery(query, mode) }
     if (limit !== undefined || offset !== undefined) {
       body.pagination = {
         ...(offset !== undefined ? { offset } : {}),

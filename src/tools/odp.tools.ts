@@ -48,11 +48,24 @@ export const registerOdpTools = (server: FastMCP): void => {
   server.addTool({
     name: "odp-search-applications",
     description:
-      "Search USPTO patent applications via the Open Data Portal. Coverage: applications filed January 1, 2001 and later. Supports full-text search across application data. Each hit returns a bibliographic summary — number, title, dates, status, applicant, inventor, CPC, art unit, examiner; call odp-get-application for one application's full record.",
+      "Search USPTO patent applications via the Open Data Portal. Coverage: applications filed " +
+      "January 1, 2001 and later. Supports Lucene syntax: quoted phrases, AND / OR / NOT, " +
+      "field:(a AND b), wildcards such as correct*, and parenthesised grouping. Bare terms are " +
+      "ANDed by default — see the mode parameter. Each hit returns a bibliographic summary: " +
+      "number, title, dates, status, applicant, inventor, CPC, art unit, examiner. Call " +
+      "odp-get-application for one application's full record.",
     parameters: z.object({
       query: z.string().describe("Search query text"),
       limit: z.number().int().min(1).max(100).default(25).describe("Number of results to return (1-100)"),
       offset: z.number().int().min(0).default(0).describe("Result offset for pagination"),
+      mode: z
+        .enum(["all", "any", "raw"])
+        .default("all")
+        .describe(
+          "How bare multi-word terms are combined: all = AND (default), any = OR, raw = sent " +
+            "verbatim. A query already containing quotes, parentheses, field:scoping or " +
+            "AND/OR/NOT is never rewritten, whatever this is set to.",
+        ),
       sortField: z
         .string()
         .optional()
@@ -74,6 +87,7 @@ export const registerOdpTools = (server: FastMCP): void => {
         const client = createClient()
         const result = await client.searchApplications({
           query: args.query,
+          mode: args.mode,
           limit: args.limit,
           offset: args.offset,
           sortField: args.sortField,

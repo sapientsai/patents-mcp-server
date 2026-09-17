@@ -39,6 +39,9 @@ pn (publication number), cpc (CPC code), pd (publication date).
 Operators: AND, OR, NOT. Truncation: * (multi-char), ? (single-char).
 Max 10 query terms, max 2000 results.
 
+Returns a triage-sized hit list: publication number, title, applicants, publication date and
+family id per hit. Use epo-get-biblio for one publication's complete record.
+
 Examples:
   ti="antibody drug conjugate"
   pa="Northwestern University" AND cpc=C07D487/04

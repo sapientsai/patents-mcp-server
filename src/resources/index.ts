@@ -77,9 +77,29 @@ Used with epo-search-patents tool:
 ### Limits: Max 10 query terms, max 2000 results per query
 
 ## USPTO ODP
-ODP uses simple text search:
-- \`searchText\` parameter with free-text query
-- Patent number formats: 17248024, 17/248,024, US 17/248,024, US-11646472-B2
+odp-search-applications accepts Lucene query-string syntax in \`q\`, not plain text.
+
+### Bare terms are OR'd by the API
+\`quantum computing error correction\` matches 972,623 applications and ranks junk first.
+The tool's \`mode\` parameter defaults to \`all\`, which ANDs bare terms (239 hits). Set
+\`mode: "any"\` for the API's raw OR behaviour, or \`mode: "raw"\` to send \`q\` verbatim.
+
+### Syntax (never rewritten, whatever the mode)
+- Phrase: \`"quantum error correction"\` — 158 hits
+- Boolean: \`quantum AND error AND correction\` — 239
+- Grouping: \`(quantum OR qubit) AND error\` — 424
+- Field-scoped: \`applicationMetaData.inventionTitle:(quantum AND error)\` — 368
+- Field + phrase: \`applicationMetaData.inventionTitle:"quantum error correction"\` — 158
+- Wildcard: \`correct*\`
+- Negation: \`... NOT laser\`
+
+Field paths are the ODP response paths, e.g. \`applicationMetaData.inventionTitle\`,
+\`applicationMetaData.firstApplicantName\`, \`applicationMetaData.filingDate\`.
+
+Note: \`searchText\` is the parameter for the GET-based ODP endpoints (PTAB, citations,
+office actions), not for application search.
+
+Patent number formats: 17248024, 17/248,024, US 17/248,024, US-11646472-B2
 
 ## Google BigQuery SQL
 Standard SQL against patents-public-data.patents.publications:

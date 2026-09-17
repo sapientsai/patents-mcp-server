@@ -140,6 +140,23 @@ const formatNumber = (number: string, format: EpoNumberFormat = "docdb"): string
   }
 }
 
+/**
+ * Verifies EPO OPS credentials by performing the OAuth client-credentials handshake.
+ *
+ * The handshake is the right probe: OPS credentials expire and get revoked, and that failure
+ * is invisible until a tool call fails. It also costs no OPS search quota. A cached, unexpired
+ * token short-circuits it, so repeated status checks are free — and a cached token is itself
+ * evidence the credentials worked within the last 19 minutes.
+ */
+export const epoHealthCheck = async (): Promise<{ healthy: boolean; error?: string }> => {
+  try {
+    await getAccessToken()
+    return { healthy: true }
+  } catch (error) {
+    return { healthy: false, error: error instanceof Error ? error.message : String(error) }
+  }
+}
+
 export const epoSearchPatents = async (query: string, range?: string): Promise<unknown> => {
   const rangePart = range ? `&Range=${range}` : ""
   return epoRequest(`published-data/search?q=${encodeURIComponent(query)}${rangePart}`)

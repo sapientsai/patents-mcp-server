@@ -1,6 +1,7 @@
 import type { FastMCP } from "fastmcp"
 import { z } from "zod"
 
+import { epoHealthCheck } from "../clients/epo-ops.client"
 import { config, getAvailableSources } from "../lib/config"
 import { handleApiError } from "../lib/errors"
 import type { ApiStatus } from "../lib/types"
@@ -116,6 +117,83 @@ const checkApiHealth = async (
   }
 }
 
+/**
+ * The live probes `buildApiStatuses` runs, injectable so tests can pin each outcome without
+ * reaching the network.
+ */
+export type HealthProbes = {
+  readonly odp: () => Promise<{ healthy: boolean; error?: string }>
+  readonly epo: () => Promise<{ healthy: boolean; error?: string }>
+}
+
+const defaultProbes: HealthProbes = {
+  odp: () =>
+    checkApiHealth(
+      "ODP",
+      "https://api.uspto.gov/api/v1/patent/applications/14412875",
+      config.usptoApiKey ? { "X-API-KEY": config.usptoApiKey } : undefined,
+    ),
+  epo: epoHealthCheck,
+}
+
+/**
+ * Builds the per-source status list behind `check-api-status`.
+ *
+ * Each configured source is probed. This is load-bearing: EPO previously reported
+ * `healthy: false` whenever it was configured, because the status object was initialised false
+ * and only the *unconfigured* branch ever assigned to it — so a working EPO account looked
+ * identical to a broken one. Exported for testing.
+ */
+export const buildApiStatuses = async (probes: HealthProbes = defaultProbes): Promise<ApiStatus[]> => {
+  const sources = getAvailableSources(config)
+  const statuses: ApiStatus[] = []
+
+  // ODP (USPTO Open Data Portal)
+  const odpStatus: ApiStatus = {
+    name: "ODP (USPTO Open Data Portal)",
+    configured: sources.find((s) => s.name === "USPTO ODP")?.configured ?? false,
+    healthy: false,
+  }
+  if (odpStatus.configured) {
+    const result = await probes.odp()
+    odpStatus.healthy = result.healthy
+    odpStatus.error = result.error
+  } else {
+    odpStatus.error = "USPTO_API_KEY not set"
+  }
+  statuses.push(odpStatus)
+
+  // EPO
+  const epoStatus: ApiStatus = {
+    name: "EPO (European Patent Office)",
+    configured: sources.find((s) => s.name === "EPO OPS")?.configured ?? false,
+    healthy: false,
+  }
+  if (epoStatus.configured) {
+    const result = await probes.epo()
+    epoStatus.healthy = result.healthy
+    epoStatus.error = result.error
+  } else {
+    epoStatus.error = "EPO_CONSUMER_KEY / EPO_CONSUMER_SECRET not set"
+  }
+  statuses.push(epoStatus)
+
+  // BigQuery. Credential presence only — this is not a live probe, unlike the two above.
+  const bqStatus: ApiStatus = {
+    name: "Google BigQuery (Patents Public Data)",
+    configured: sources.find((s) => s.name === "Google BigQuery")?.configured ?? false,
+    healthy: false,
+  }
+  if (bqStatus.configured) {
+    bqStatus.healthy = !!(config.googleApplicationCredentials || config.googleCredentialsJson)
+  } else {
+    bqStatus.error = "GOOGLE_CLOUD_PROJECT / GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_CREDENTIALS_JSON not set"
+  }
+  statuses.push(bqStatus)
+
+  return statuses
+}
+
 export const registerUtilityTools = (server: FastMCP): void => {
   server.addTool({
     name: "check-api-status",
@@ -124,56 +202,7 @@ export const registerUtilityTools = (server: FastMCP): void => {
     annotations: UTILITY_ANNOTATIONS,
     execute: async () => {
       try {
-        const sources = getAvailableSources(config)
-        const statuses: ApiStatus[] = []
-
-        // ODP (USPTO Open Data Portal)
-        const odpSource = sources.find((s) => s.name === "USPTO ODP")
-        const odpStatus: ApiStatus = {
-          name: "ODP (USPTO Open Data Portal)",
-          configured: odpSource?.configured ?? false,
-          healthy: false,
-        }
-        if (odpStatus.configured) {
-          const apiKey = config.usptoApiKey
-          const healthResult = await checkApiHealth(
-            "ODP",
-            "https://api.uspto.gov/api/v1/patent/applications/14412875",
-            apiKey ? { "X-API-KEY": apiKey } : undefined,
-          )
-          odpStatus.healthy = healthResult.healthy
-          odpStatus.error = healthResult.error
-        } else {
-          odpStatus.error = "USPTO_API_KEY not set"
-        }
-        statuses.push(odpStatus)
-
-        // EPO
-        const epoSource = sources.find((s) => s.name === "EPO OPS")
-        const epoStatus: ApiStatus = {
-          name: "EPO (European Patent Office)",
-          configured: epoSource?.configured ?? false,
-          healthy: false,
-        }
-        if (!epoStatus.configured) {
-          epoStatus.error = "EPO_CONSUMER_KEY / EPO_CONSUMER_SECRET not set"
-        }
-        statuses.push(epoStatus)
-
-        // BigQuery
-        const bqSource = sources.find((s) => s.name === "Google BigQuery")
-        const bqStatus: ApiStatus = {
-          name: "Google BigQuery (Patents Public Data)",
-          configured: bqSource?.configured ?? false,
-          healthy: false,
-        }
-        if (bqStatus.configured) {
-          bqStatus.healthy = !!(config.googleApplicationCredentials || config.googleCredentialsJson)
-        } else {
-          bqStatus.error = "GOOGLE_CLOUD_PROJECT / GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_CREDENTIALS_JSON not set"
-        }
-        statuses.push(bqStatus)
-
+        const statuses = await buildApiStatuses()
         return JSON.stringify({ statuses })
       } catch (error) {
         return handleApiError(error)

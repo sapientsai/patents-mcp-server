@@ -309,6 +309,21 @@ export const epoSearchPatents = async (query: string, range?: string): Promise<E
   return projectSearchResults(parsed)
 }
 
+export type EpoPriorityClaim = {
+  number: string
+  date?: string
+  kind?: string
+  sequence: number
+}
+
+export type EpoCitation = {
+  /** A cited publication number, or the free text of a non-patent reference. */
+  reference: string
+  type: "patent" | "non-patent"
+  /** Who put it on the record — typically "applicant" or "examiner". */
+  citedBy?: string
+}
+
 export type EpoPublication = {
   publicationNumber: string
   country?: string
@@ -319,6 +334,13 @@ export type EpoPublication = {
   applicants: string[]
   inventors: string[]
   ipcClasses: string[]
+  cpcClasses: string[]
+  /** National classification symbols, e.g. the USPC entry on a US grant. */
+  nationalClasses: string[]
+  priorityClaims: EpoPriorityClaim[]
+  /** The earliest priority date, which is what sets the prior-art cut-off. */
+  earliestPriorityDate?: string
+  citations: EpoCitation[]
   applicationNumber?: string
   familyId?: string
 }
@@ -345,6 +367,92 @@ const pickAbstract = (abstract: unknown): string | undefined => {
   return asText(at(chosen, "p")) ?? asText(at(chosen, "#text"))
 }
 
+/** OPS renders IPC symbols fixed-width: `G06F   7/    00            A I`. */
+const IPC_SYMBOL = /^([A-H]\d{2}[A-Z])\s*(\d+)\s*\/\s*(\d+)/
+
+const normalizeIpc = (raw: string): string => {
+  const match = IPC_SYMBOL.exec(raw.trim())
+  return match ? `${match[1]}${match[2]}/${match[3]}` : raw.replace(/\s+/g, " ").trim()
+}
+
+/**
+ * Builds a CPC symbol from the split fields OPS returns.
+ *
+ * `class` and `subgroup` arrive as JSON numbers, so class 6 must be padded back to `06` or the
+ * symbol comes out as `G6F9/5066` instead of `G06F9/5066`. National (UC) entries carry a
+ * ready-made `classification-symbol` and none of the split fields.
+ */
+const classificationSymbol = (node: Node): { scheme: string; symbol: string } | undefined => {
+  const scheme = asText(at(asNode(at(node, "classification-scheme")), "@_scheme"))
+  if (scheme === undefined) return undefined
+
+  const ready = asText(at(node, "classification-symbol"))
+  if (ready !== undefined) return { scheme, symbol: ready }
+
+  const section = asText(at(node, "section"))
+  const cls = asText(at(node, "class"))
+  const subclass = asText(at(node, "subclass"))
+  if (section === undefined || cls === undefined || subclass === undefined) return undefined
+
+  const base = `${section}${cls.padStart(2, "0")}${subclass}`
+  const mainGroup = asText(at(node, "main-group"))
+  if (mainGroup === undefined) return { scheme, symbol: base }
+  return { scheme, symbol: `${base}${mainGroup}/${asText(at(node, "subgroup")) ?? "00"}` }
+}
+
+/**
+ * CPC and national classification symbols.
+ *
+ * OPS emits every CPC symbol twice, once per generating office (US and EP), so this dedupes —
+ * otherwise the list silently doubles.
+ */
+const extractClassifications = (bib: Node | undefined): { cpcClasses: string[]; nationalClasses: string[] } => {
+  const all = asNodes(at(asNode(at(bib, "patent-classifications")), "patent-classification"))
+    .map(classificationSymbol)
+    .filter((c): c is { scheme: string; symbol: string } => c !== undefined)
+  const symbols = (predicate: (scheme: string) => boolean) => [
+    ...new Set(all.filter((c) => predicate(c.scheme)).map((c) => c.symbol)),
+  ]
+  return {
+    cpcClasses: symbols((scheme) => scheme.startsWith("CPC")),
+    nationalClasses: symbols((scheme) => scheme === "UC"),
+  }
+}
+
+/** Priority claims, which set the prior-art cut-off and so belong in any bibliographic record. */
+const extractPriorityClaims = (bib: Node | undefined): EpoPriorityClaim[] =>
+  asNodes(at(asNode(at(bib, "priority-claims")), "priority-claim"))
+    .map((claim, index) => {
+      const ids = asNodes(at(claim, "document-id"))
+      const source =
+        ids.find((d) => d["@_document-id-type"] === "epodoc") ?? ids.find((d) => d["@_document-id-type"] === "docdb")
+      return {
+        number: asText(at(source, "doc-number")) ?? "",
+        date: normalizeDate(at(source, "date")),
+        kind: asText(at(claim, "@_kind")),
+        sequence: Number(asText(at(claim, "@_sequence")) ?? index + 1),
+      }
+    })
+    .filter((claim) => claim.number !== "")
+
+/** Prior art on the record — examiner and applicant citations, patent and non-patent alike. */
+const extractCitations = (bib: Node | undefined): EpoCitation[] =>
+  asNodes(at(asNode(at(bib, "references-cited")), "citation"))
+    .map((citation) => {
+      const patent = asNode(at(citation, "patcit"))
+      const citedBy = asText(at(citation, "@_cited-by"))
+      if (patent !== undefined) {
+        const ids = asNodes(at(patent, "document-id"))
+        const source =
+          ids.find((d) => d["@_document-id-type"] === "epodoc") ?? ids.find((d) => d["@_document-id-type"] === "docdb")
+        const reference = asText(at(source, "doc-number")) ?? ""
+        return { reference, type: "patent" as const, citedBy }
+      }
+      const text = asText(at(asNode(at(citation, "nplcit")), "text"))
+      return { reference: text ?? "", type: "non-patent" as const, citedBy }
+    })
+    .filter((citation) => citation.reference !== "")
+
 /**
  * Flattens an OPS biblio response to one entry per publication.
  *
@@ -362,6 +470,7 @@ export const projectBiblio = (parsed: unknown): EpoBiblio => {
     const epodoc = byType("epodoc")
     const docdb = byType("docdb")
     const appIds = asNodes(at(asNode(at(bib, "application-reference")), "document-id"))
+    const priorityClaims = extractPriorityClaims(bib)
 
     return {
       publicationNumber:
@@ -375,8 +484,16 @@ export const projectBiblio = (parsed: unknown): EpoBiblio => {
       applicants: extractApplicants(bib),
       inventors: extractInventors(bib),
       ipcClasses: asNodes(at(asNode(at(bib, "classifications-ipcr")), "classification-ipcr"))
-        .map((c) => asText(at(c, "text"))?.replace(/\s+/g, " ").trim())
-        .filter((c): c is string => c !== undefined),
+        .map((c) => asText(at(c, "text")))
+        .filter((c): c is string => c !== undefined)
+        .map(normalizeIpc),
+      ...extractClassifications(bib),
+      priorityClaims,
+      earliestPriorityDate: priorityClaims
+        .map((claim) => claim.date)
+        .filter((date): date is string => date !== undefined)
+        .sort()[0],
+      citations: extractCitations(bib),
       applicationNumber: asText(
         at(appIds.find((d) => d["@_document-id-type"] === "epodoc") ?? appIds[0], "doc-number"),
       ),
@@ -825,7 +942,8 @@ export const projectNumberConversion = (
     kind === undefined
       ? undefined
       : `OPS resolved this to the ${kind} publication. A number without a kind code may publish ` +
-        `under several; epo-get-biblio lists them, and epo-get-claims and epo-get-description ` +
+        `under several; epo-get-biblio returns an entry per publication of a number, and ` +
+        `epo-get-claims and epo-get-description ` +
         `prefer the granted publication rather than this one.`
 
   return {

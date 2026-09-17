@@ -320,6 +320,50 @@ describe("projectBiblio", () => {
                 inventors: { inventor: [{ "inventor-name": { name: "KOSMAN W" }, "@_data-format": "epodoc" }] },
               },
               "classifications-ipcr": { "classification-ipcr": [{ text: "B28B   1/    29            A I" }] },
+              "patent-classifications": {
+                "patent-classification": [
+                  // OPS emits each CPC symbol once per generating office, and `class` is a number.
+                  {
+                    "classification-scheme": { "@_scheme": "CPCI" },
+                    section: "G",
+                    class: 6,
+                    subclass: "F",
+                    "main-group": 9,
+                    subgroup: 5066,
+                    "generating-office": "US",
+                  },
+                  {
+                    "classification-scheme": { "@_scheme": "CPCI" },
+                    section: "G",
+                    class: 6,
+                    subclass: "F",
+                    "main-group": 9,
+                    subgroup: 5066,
+                    "generating-office": "EP",
+                  },
+                  { "classification-scheme": { "@_scheme": "UC" }, "classification-symbol": "712/203" },
+                ],
+              },
+              "priority-claims": {
+                "priority-claim": [
+                  {
+                    "@_sequence": "1",
+                    "@_kind": "national",
+                    "document-id": [
+                      { country: "US", "doc-number": 87124404, date: 20040618, "@_document-id-type": "docdb" },
+                      { "doc-number": "US20040871244", date: 20040618, "@_document-id-type": "epodoc" },
+                    ],
+                  },
+                ],
+              },
+              "references-cited": {
+                // A single citation arrives as a bare object, not a list — `citation` is not in
+                // the parser's isArray set, which is exactly how OPS shapes bite.
+                citation: {
+                  "@_cited-by": "examiner",
+                  patcit: { "document-id": [{ "doc-number": "US3905023", "@_document-id-type": "epodoc" }] },
+                },
+              },
             },
           },
         ],
@@ -342,12 +386,56 @@ describe("projectBiblio", () => {
     })
   })
 
-  it("collapses the runs of padding OPS puts in IPC symbols", () => {
-    expect(projectBiblio(response).publications[0].ipcClasses).toEqual(["B28B 1/ 29 A I"])
+  it("normalises the fixed-width padding OPS puts in IPC symbols", () => {
+    expect(projectBiblio(response).publications[0].ipcClasses).toEqual(["B28B1/29"])
+  })
+
+  it("reads CPC, zero-padding the class and deduping across generating offices", () => {
+    // `class: 6` unpadded yields G6F9/5066, and each symbol appears once per office.
+    expect(projectBiblio(response).publications[0].cpcClasses).toEqual(["G06F9/5066"])
+  })
+
+  it("reads national classification symbols, which carry no split fields", () => {
+    expect(projectBiblio(response).publications[0].nationalClasses).toEqual(["712/203"])
+  })
+
+  it("reads priority claims and the earliest priority date", () => {
+    // The earliest priority date is what sets the prior-art cut-off.
+    const publication = projectBiblio(response).publications[0]
+    expect(publication.priorityClaims).toEqual([
+      { number: "US20040871244", date: "2004-06-18", kind: "national", sequence: 1 },
+    ])
+    expect(publication.earliestPriorityDate).toBe("2004-06-18")
+  })
+
+  it("reads a lone citation delivered as a bare object rather than a list", () => {
+    expect(projectBiblio(response).publications[0].citations).toEqual([
+      { reference: "US3905023", type: "patent", citedBy: "examiner" },
+    ])
   })
 
   it("returns no publications rather than throwing on a malformed response", () => {
     expect(projectBiblio({}).publications).toEqual([])
+  })
+
+  it("leaves every documented field present, so the mapper cannot go quietly lossy again", () => {
+    // Both regressions here were the same shape: a node in the payload the mapper never visited.
+    const publication = projectBiblio(response).publications[0]
+    for (const field of [
+      "publicationNumber",
+      "title",
+      "applicants",
+      "inventors",
+      "ipcClasses",
+      "cpcClasses",
+      "nationalClasses",
+      "priorityClaims",
+      "citations",
+      "publicationDate",
+      "familyId",
+    ]) {
+      expect(publication).toHaveProperty(field)
+    }
   })
 })
 

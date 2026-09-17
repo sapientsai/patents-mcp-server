@@ -8,9 +8,10 @@ import {
   epoNumberConvert,
   epoSearchPatents,
   epoFamilyLookup,
-  extractKinds,
+  projectBiblio,
   projectFamily,
   projectLegalStatus,
+  projectNumberConversion,
   projectSearchResults,
 } from "../src/clients/epo-ops.client"
 
@@ -108,24 +109,6 @@ describe("projectSearchResults", () => {
 
   it("returns an empty list rather than throwing on a malformed response", () => {
     expect(projectSearchResults({})).toEqual({ total: 0, returned: 0, hits: [] })
-  })
-})
-
-// Pure, so CI runs it without credentials.
-describe("extractKinds", () => {
-  it("lists every kind a number is published under", () => {
-    const biblio = {
-      "world-patent-data": {
-        "exchange-documents": {
-          "exchange-document": [{ "@_kind": "A1" }, { "@_kind": "B1" }],
-        },
-      },
-    }
-    expect(extractKinds(biblio)).toEqual(["A1", "B1"])
-  })
-
-  it("returns an empty list on a malformed response rather than throwing", () => {
-    expect(extractKinds({})).toEqual([])
   })
 })
 
@@ -263,12 +246,137 @@ describe("projectLegalStatus", () => {
     expect(json).not.toContain("00010101")
   })
 
+  it("points a publication with no events at the sibling that has them", () => {
+    // OPS hangs the EP history off the A1 and leaves the granted B1 empty. Read alone, an empty
+    // B1 says "nothing adverse recorded" when it means "recorded elsewhere".
+    const withB1 = {
+      "world-patent-data": {
+        "patent-family": {
+          "@_total-result-count": "2",
+          "family-member": [
+            {
+              "publication-reference": {
+                "document-id": [
+                  { country: "EP", "doc-number": 1000000, kind: "A1", "@_document-id-type": "docdb" },
+                  { "doc-number": "EP1000000", "@_document-id-type": "epodoc" },
+                ],
+              },
+              legal: [event("PG25", "CH", 20030212)],
+            },
+            {
+              "publication-reference": {
+                "document-id": [
+                  { country: "EP", "doc-number": 1000000, kind: "B1", "@_document-id-type": "docdb" },
+                  { "doc-number": "EP1000000", "@_document-id-type": "epodoc" },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    }
+    const b1 = projectLegalStatus(withB1).members[1]
+    expect(b1.kind).toBe("B1")
+    expect(b1.events).toHaveLength(0)
+    expect(b1.eventsRecordedOn).toBe("EP1000000A1")
+    expect(b1.note).toMatch(/EP1000000A1/)
+  })
+
+  it("leaves a member that genuinely has events alone", () => {
+    expect(projectLegalStatus(response).members[0].note).toBeUndefined()
+  })
+
   it("counts events across members", () => {
     expect(projectLegalStatus(response).eventCount).toBe(3)
   })
 
   it("returns an empty result rather than throwing on a malformed response", () => {
     expect(projectLegalStatus({})).toMatchObject({ total: 0, eventCount: 0, members: [] })
+  })
+})
+
+// Pure, so CI runs it without credentials.
+describe("projectBiblio", () => {
+  const response = {
+    "world-patent-data": {
+      "exchange-documents": {
+        "exchange-document": [
+          {
+            "@_country": "EP",
+            "@_kind": "A1",
+            "@_family-id": "19768124",
+            "bibliographic-data": {
+              "publication-reference": {
+                "document-id": [
+                  { country: "EP", "doc-number": 1000000, kind: "A1", date: 20000517, "@_document-id-type": "docdb" },
+                  { "doc-number": "EP1000000", date: 20000517, "@_document-id-type": "epodoc" },
+                ],
+              },
+              "invention-title": [{ "#text": "Apparatus for manufacturing green bricks", "@_lang": "en" }],
+              parties: {
+                applicants: { applicant: [{ "applicant-name": { name: "DE BOER BV" }, "@_data-format": "epodoc" }] },
+                inventors: { inventor: [{ "inventor-name": { name: "KOSMAN W" }, "@_data-format": "epodoc" }] },
+              },
+              "classifications-ipcr": { "classification-ipcr": [{ text: "B28B   1/    29            A I" }] },
+            },
+          },
+        ],
+      },
+    },
+  }
+
+  it("returns one entry per publication, flattened", () => {
+    const { publications } = projectBiblio(response)
+    expect(publications).toHaveLength(1)
+    expect(publications[0]).toMatchObject({
+      publicationNumber: "EP1000000",
+      country: "EP",
+      kind: "A1",
+      publicationDate: "2000-05-17",
+      title: "Apparatus for manufacturing green bricks",
+      applicants: ["DE BOER BV"],
+      inventors: ["KOSMAN W"],
+      familyId: "19768124",
+    })
+  })
+
+  it("collapses the runs of padding OPS puts in IPC symbols", () => {
+    expect(projectBiblio(response).publications[0].ipcClasses).toEqual(["B28B 1/ 29 A I"])
+  })
+
+  it("returns no publications rather than throwing on a malformed response", () => {
+    expect(projectBiblio({}).publications).toEqual([])
+  })
+})
+
+// Pure, so CI runs it without credentials.
+describe("projectNumberConversion", () => {
+  const response = {
+    "world-patent-data": {
+      meta: { "@_name": "status", "@_value": "SUCCESS" },
+      standardization: {
+        output: {
+          "publication-reference": {
+            "document-id": [{ country: "EP", "doc-number": 1000000, kind: "A1", date: 20000517 }],
+          },
+        },
+      },
+    },
+  }
+
+  it("renders the converted number in the requested format", () => {
+    const result = projectNumberConversion(response, "epodoc", "docdb", "EP1000000")
+    expect(result.status).toBe("SUCCESS")
+    expect(result.input).toEqual({ format: "epodoc", number: "EP1000000" })
+    expect(result.output).toMatchObject({ format: "docdb", number: "EP.1000000.A1", kind: "A1", date: "2000-05-17" })
+  })
+
+  it("says which kind OPS picked, since claims and description pick a different one", () => {
+    // A bare number resolves here to A1 while epo-get-claims prefers the granted B1; two tools
+    // silently disagreeing about which document a number means is how texts get compared wrongly.
+    const { note } = projectNumberConversion(response, "epodoc", "docdb", "EP1000000")
+    expect(note).toContain("A1")
+    expect(note).toMatch(/epo-get-claims/)
   })
 })
 
@@ -325,8 +433,10 @@ describe.skipIf(!hasCreds)("EPO OPS (integration)", () => {
     it.each(["US7650331B1", "EP1000000", "EP.1000000.A1"])(
       "resolves %s with no explicit format",
       async (number) => {
-        const result = (await epoGetBiblio(number)) as Record<string, any>
-        expect(result["world-patent-data"]?.["exchange-documents"]).toBeDefined()
+        const { publications } = await epoGetBiblio(number)
+        expect(publications.length).toBeGreaterThan(0)
+        expect(publications[0].publicationNumber).toMatch(/^[A-Z]{2}\d+/)
+        expect(publications[0].title).toBeTruthy()
       },
       30000,
     )

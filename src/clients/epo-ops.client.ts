@@ -296,9 +296,93 @@ export const epoSearchPatents = async (query: string, range?: string): Promise<E
   return projectSearchResults(parsed)
 }
 
-export const epoGetBiblio = async (number: string, format?: EpoNumberFormat): Promise<unknown> => {
+export type EpoPublication = {
+  publicationNumber: string
+  country?: string
+  kind?: string
+  publicationDate?: string
+  title?: string
+  abstract?: string
+  applicants: string[]
+  inventors: string[]
+  ipcClasses: string[]
+  applicationNumber?: string
+  familyId?: string
+}
+
+export type EpoBiblio = {
+  /** One entry per publication of this number — a number granted in Europe yields A1 and B1. */
+  publications: EpoPublication[]
+}
+
+/** Inventors in their epodoc rendering, for the same reason as applicants. */
+const extractInventors = (bibliographicData: Node | undefined): string[] =>
+  asNodes(at(asNode(at(asNode(at(bibliographicData, "parties")), "inventors")), "inventor"))
+    .filter((i) => i["@_data-format"] !== "original")
+    .map((i) => asText(at(asNode(at(i, "inventor-name")), "name")))
+    .filter((n): n is string => n !== undefined)
+
+/** Abstract text, preferring English; OPS may return one per language. */
+const pickAbstract = (abstract: unknown): string | undefined => {
+  const list = asNodes(abstract)
+  const chosen = list.find((a) => a["@_lang"] === "en") ?? list[0]
+  const paragraphs = asNodes(at(chosen, "p"))
+  const text = paragraphs.map((p) => asText(at(p, "#text"))).filter((t): t is string => t !== undefined)
+  if (text.length > 0) return text.join(" ")
+  return asText(at(chosen, "p")) ?? asText(at(chosen, "#text"))
+}
+
+/**
+ * Flattens an OPS biblio response to one entry per publication.
+ *
+ * Exported for testing.
+ */
+export const projectBiblio = (parsed: unknown): EpoBiblio => {
+  const documents = asNodes(
+    at(asNode(at(asNode(at(asNode(parsed), "world-patent-data")), "exchange-documents")), "exchange-document"),
+  )
+
+  const publications: EpoPublication[] = documents.map((doc) => {
+    const bib = asNode(at(doc, "bibliographic-data"))
+    const ids = asNodes(at(asNode(at(bib, "publication-reference")), "document-id"))
+    const byType = (type: string) => ids.find((d) => d["@_document-id-type"] === type)
+    const epodoc = byType("epodoc")
+    const docdb = byType("docdb")
+    const appIds = asNodes(at(asNode(at(bib, "application-reference")), "document-id"))
+
+    return {
+      publicationNumber:
+        asText(at(epodoc, "doc-number")) ??
+        `${asText(at(docdb, "country")) ?? ""}${asText(at(docdb, "doc-number")) ?? ""}`,
+      country: asText(at(docdb, "country")) ?? asText(at(doc, "@_country")),
+      kind: asText(at(docdb, "kind")) ?? asText(at(doc, "@_kind")),
+      publicationDate: normalizeDate(at(epodoc, "date") ?? at(docdb, "date")),
+      title: pickTitle(at(bib, "invention-title")),
+      abstract: pickAbstract(at(doc, "abstract")),
+      applicants: extractApplicants(bib),
+      inventors: extractInventors(bib),
+      ipcClasses: asNodes(at(asNode(at(bib, "classifications-ipcr")), "classification-ipcr"))
+        .map((c) => asText(at(c, "text"))?.replace(/\s+/g, " ").trim())
+        .filter((c): c is string => c !== undefined),
+      applicationNumber: asText(
+        at(appIds.find((d) => d["@_document-id-type"] === "epodoc") ?? appIds[0], "doc-number"),
+      ),
+      familyId: asText(at(doc, "@_family-id")),
+    }
+  })
+
+  return { publications }
+}
+
+/**
+ * Bibliographic data for a publication number.
+ *
+ * Returns every publication of that number rather than picking one: EP1000000 is both the A1
+ * application and the B1 grant, and which one a caller means is their business here.
+ */
+export const epoGetBiblio = async (number: string, format?: EpoNumberFormat): Promise<EpoBiblio> => {
   const { format: fmt, num } = resolveRef(number, format)
-  return epoRequest(`published-data/publication/${fmt}/${num}/biblio`)
+  return projectBiblio(await epoRequest(`published-data/publication/${fmt}/${num}/biblio`))
 }
 
 export const epoGetAbstract = async (number: string, format?: EpoNumberFormat): Promise<unknown> => {
@@ -318,14 +402,6 @@ export type EpoTextResult = {
   granted: boolean
   note?: string
   document: unknown
-}
-
-/** Reads the kind codes OPS publishes for a number out of a biblio response. */
-export const extractKinds = (biblio: unknown): string[] => {
-  const documents = asNodes(
-    at(asNode(at(asNode(at(asNode(biblio), "world-patent-data")), "exchange-documents")), "exchange-document"),
-  )
-  return documents.map((d) => asText(at(d, "@_kind"))).filter((k): k is string => k !== undefined)
 }
 
 /** The kind a constituent response says it came from. */
@@ -395,7 +471,9 @@ const fetchText = async (
   // The caller pinned a kind (docdb) or an original-format number: take them at their word.
   if (fmt !== "epodoc") return serve(`${fmt}/${num}`, num, [])
 
-  const kinds = extractKinds(await epoGetBiblio(num, "epodoc"))
+  const kinds = (await epoGetBiblio(num, "epodoc")).publications
+    .map((publication) => publication.kind)
+    .filter((kind): kind is string => kind !== undefined)
   const granted = kinds
     .filter((k) => GRANTED_KIND.test(k))
     .sort()
@@ -517,6 +595,12 @@ export type EpoLegalStatusMember = {
   publicationNumber: string
   kind?: string
   events: EpoLegalEvent[]
+  /**
+   * Set when this publication carries no events of its own but a sibling of the same number
+   * does — the granted B1 is typically empty while the whole EP history hangs off the A1.
+   */
+  eventsRecordedOn?: string
+  note?: string
 }
 
 export type EpoLegalStatus = {
@@ -590,6 +674,24 @@ export const projectLegalStatus = (parsed: unknown): EpoLegalStatus => {
     ...new Set(members.flatMap((m) => [m.country, ...m.events.map((e) => e.country)]).filter((c): c is string => !!c)),
   ].sort()
 
+  // OPS hangs the whole EP prosecution history off the A1 and leaves the granted B1 empty: for
+  // EP1000000 that is 50 events against 0. Read on its own, a B1 with no events says "nothing
+  // adverse recorded" when it means "recorded elsewhere" — and the B1 is the publication a
+  // freedom-to-operate question is actually about. Point at the sibling rather than copying its
+  // events onto a record OPS never attached them to.
+  for (const member of members) {
+    if (member.events.length > 0) continue
+    const sibling = members.find(
+      (s) => s !== member && s.publicationNumber === member.publicationNumber && s.events.length > 0,
+    )
+    if (sibling === undefined) continue
+    const siblingId = `${sibling.publicationNumber}${sibling.kind ?? ""}`
+    member.eventsRecordedOn = siblingId
+    member.note =
+      `No legal events are recorded against this publication. OPS attaches the history for this ` +
+      `number to ${siblingId} — read that record's events, which govern this publication too.`
+  }
+
   return {
     total,
     eventCount: members.reduce((n, m) => n + m.events.length, 0),
@@ -612,6 +714,74 @@ export const epoLegalStatus = async (number: string, format?: EpoNumberFormat): 
 /** What an OPS number refers to. The number service requires this segment in the path. */
 export type EpoReferenceType = "publication" | "application" | "priority"
 
+export type EpoNumberConversion = {
+  status?: string
+  input: { format: EpoNumberFormat; number: string }
+  output: {
+    format: EpoNumberFormat
+    number: string
+    country?: string
+    docNumber?: string
+    kind?: string
+    date?: string
+  }
+  note?: string
+}
+
+/** Renders a document-id node as the number a caller would write in that format. */
+const renderNumber = (id: Node | undefined, format: EpoNumberFormat): string => {
+  const docNumber = asText(at(id, "doc-number")) ?? ""
+  const country = asText(at(id, "country")) ?? ""
+  const kind = asText(at(id, "kind")) ?? ""
+  if (format !== "docdb") return docNumber || `${country}${docNumber}`
+  return [country, docNumber, kind].filter(Boolean).join(".")
+}
+
+/**
+ * Flattens an OPS number-service response.
+ *
+ * Exported for testing.
+ */
+export const projectNumberConversion = (
+  parsed: unknown,
+  inputFormat: EpoNumberFormat,
+  outputFormat: EpoNumberFormat,
+  requested: string,
+): EpoNumberConversion => {
+  const root = asNode(at(asNode(parsed), "world-patent-data"))
+  const status = asText(at(asNode(at(root, "meta")), "@_value"))
+  const standardization = asNode(at(root, "standardization"))
+  const outputId = asNodes(
+    at(asNode(at(asNode(at(standardization, "output")), "publication-reference")), "document-id"),
+  )[0]
+
+  const kind = asText(at(outputId, "kind"))
+  // OPS resolves a kind-less input to the earliest publication, so `EP1000000` converts to the
+  // A1 — while epo-get-claims and epo-get-description deliberately prefer the granted B1. Two
+  // tools in one toolset disagreeing about which document a bare number means is how someone
+  // ends up comparing the wrong texts, so say which was chosen rather than leaving it implicit.
+  const note =
+    kind === undefined
+      ? undefined
+      : `OPS resolved this to the ${kind} publication. A number without a kind code may publish ` +
+        `under several; epo-get-biblio lists them, and epo-get-claims and epo-get-description ` +
+        `prefer the granted publication rather than this one.`
+
+  return {
+    status,
+    input: { format: inputFormat, number: requested },
+    output: {
+      format: outputFormat,
+      number: renderNumber(outputId, outputFormat),
+      country: asText(at(outputId, "country")),
+      docNumber: asText(at(outputId, "doc-number")),
+      kind,
+      date: normalizeDate(at(outputId, "date")),
+    },
+    note,
+  }
+}
+
 /**
  * Converts a number between OPS formats.
  *
@@ -624,7 +794,8 @@ export const epoNumberConvert = async (
   inputFormat: EpoNumberFormat,
   outputFormat: EpoNumberFormat,
   referenceType: EpoReferenceType = "publication",
-): Promise<unknown> => {
+): Promise<EpoNumberConversion> => {
   const num = inputFormat === "original" ? number : number.replace(/\s+/g, "").replace(/[/,]/g, "")
-  return epoRequest(`number-service/${referenceType}/${inputFormat}/${num}/${outputFormat}`)
+  const parsed = await epoRequest(`number-service/${referenceType}/${inputFormat}/${num}/${outputFormat}`)
+  return projectNumberConversion(parsed, inputFormat, outputFormat, num)
 }

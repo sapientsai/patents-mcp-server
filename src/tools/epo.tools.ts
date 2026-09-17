@@ -64,7 +64,7 @@ Examples:
   server.addTool({
     name: "epo-get-biblio",
     description:
-      "Get bibliographic data for a patent from EPO OPS. Returns title, applicants, inventors, classification, priority claims, and publication details.",
+      "Get bibliographic data for a patent from EPO OPS. Returns one flattened entry per publication of that number — a European patent yields both the A1 application and the B1 grant — each with title, abstract, applicants, inventors, IPC classes, dates and family id.",
     parameters: z.object({
       number: z.string().describe("Patent number (e.g., EP1000000, US7650331B1, WO2020123456)"),
       format: numberFormatSchema,

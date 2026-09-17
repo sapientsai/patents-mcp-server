@@ -1,4 +1,5 @@
 import { config } from "./config"
+import { isRetryableError } from "./errors"
 
 type RetryOptions = {
   maxRetries: number
@@ -31,7 +32,8 @@ export const withRetry = async <T>(fn: () => Promise<T>, opts?: Partial<RetryOpt
     } catch (error) {
       lastError = error
 
-      if (attempt === maxRetries) {
+      // A permanent failure will not become a success on the next attempt; surface it now.
+      if (attempt === maxRetries || !isRetryableError(error)) {
         break
       }
 

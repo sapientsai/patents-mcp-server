@@ -3,7 +3,13 @@ import { z } from "zod"
 
 import { OdpClient } from "../clients/odp.client"
 import { config } from "../lib/config"
-import { handleApiError } from "../lib/errors"
+import { handleApiError, handleTierError } from "../lib/errors"
+
+/** 403 here means the PTAB tier is not entitled, not that the request was malformed. */
+export const handlePtabError = handleTierError(
+  "PTAB",
+  "PTAB proceedings and decisions are also published at ptacts.uspto.gov; for the underlying application, odp-get-application and odp-get-documents still work with this key.",
+)
 
 const PTAB_ANNOTATIONS = {
   readOnlyHint: true,
@@ -40,7 +46,7 @@ export const registerPtabTools = (server: FastMCP): void => {
         const result = await client.searchProceedings(args.query, args.type, args.limit)
         return JSON.stringify(result)
       } catch (error) {
-        return handleApiError(error)
+        return handlePtabError(error)
       }
     },
   })
@@ -58,7 +64,7 @@ export const registerPtabTools = (server: FastMCP): void => {
         const result = await client.getProceeding(args.trialNumber)
         return JSON.stringify(result)
       } catch (error) {
-        return handleApiError(error)
+        return handlePtabError(error)
       }
     },
   })
@@ -76,7 +82,7 @@ export const registerPtabTools = (server: FastMCP): void => {
         const result = await client.getProceedingDocuments(args.trialNumber)
         return JSON.stringify(result)
       } catch (error) {
-        return handleApiError(error)
+        return handlePtabError(error)
       }
     },
   })
@@ -95,7 +101,7 @@ export const registerPtabTools = (server: FastMCP): void => {
         const result = await client.searchDecisions(args.query, args.limit)
         return JSON.stringify(result)
       } catch (error) {
-        return handleApiError(error)
+        return handlePtabError(error)
       }
     },
   })
@@ -113,7 +119,7 @@ export const registerPtabTools = (server: FastMCP): void => {
         const result = await client.getDecision(args.decisionId)
         return JSON.stringify(result)
       } catch (error) {
-        return handleApiError(error)
+        return handlePtabError(error)
       }
     },
   })
@@ -132,7 +138,7 @@ export const registerPtabTools = (server: FastMCP): void => {
         const result = await client.searchAppeals(args.query, args.limit)
         return JSON.stringify(result)
       } catch (error) {
-        return handleApiError(error)
+        return handlePtabError(error)
       }
     },
   })
@@ -150,7 +156,7 @@ export const registerPtabTools = (server: FastMCP): void => {
         const result = await client.getAppeal(args.appealId)
         return JSON.stringify(result)
       } catch (error) {
-        return handleApiError(error)
+        return handlePtabError(error)
       }
     },
   })

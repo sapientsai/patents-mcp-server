@@ -3,7 +3,13 @@ import { z } from "zod"
 
 import { OdpClient } from "../clients/odp.client"
 import { config } from "../lib/config"
-import { handleApiError } from "../lib/errors"
+import { handleApiError, handleTierError } from "../lib/errors"
+
+/** 403 here means the citations and litigation tier is not entitled, not that the request was malformed. */
+export const handleCitationsError = handleTierError(
+  "citations and litigation",
+  "For citation data, bigquery-citation-network covers US patents when BigQuery is configured, and epo-family-lookup covers international families.",
+)
 
 const CITATIONS_ANNOTATIONS = {
   readOnlyHint: true,
@@ -38,7 +44,7 @@ export const registerCitationsTools = (server: FastMCP): void => {
         const result = await client.getEnrichedCitations(args.patentNumber)
         return JSON.stringify(result)
       } catch (error) {
-        return handleApiError(error)
+        return handleCitationsError(error)
       }
     },
   })
@@ -57,7 +63,7 @@ export const registerCitationsTools = (server: FastMCP): void => {
         const result = await client.searchCitations(args.query, args.limit)
         return JSON.stringify(result)
       } catch (error) {
-        return handleApiError(error)
+        return handleCitationsError(error)
       }
     },
   })
@@ -76,7 +82,7 @@ export const registerCitationsTools = (server: FastMCP): void => {
         const result = await client.getCitationMetrics(args.patentNumber)
         return JSON.stringify(result)
       } catch (error) {
-        return handleApiError(error)
+        return handleCitationsError(error)
       }
     },
   })
@@ -111,7 +117,7 @@ export const registerCitationsTools = (server: FastMCP): void => {
         })
         return JSON.stringify(result)
       } catch (error) {
-        return handleApiError(error)
+        return handleCitationsError(error)
       }
     },
   })
@@ -129,7 +135,7 @@ export const registerCitationsTools = (server: FastMCP): void => {
         const result = await client.getLitigationCase(args.caseId)
         return JSON.stringify(result)
       } catch (error) {
-        return handleApiError(error)
+        return handleCitationsError(error)
       }
     },
   })
@@ -147,7 +153,7 @@ export const registerCitationsTools = (server: FastMCP): void => {
         const result = await client.getLitigationByPatent(args.patentNumber)
         return JSON.stringify(result)
       } catch (error) {
-        return handleApiError(error)
+        return handleCitationsError(error)
       }
     },
   })

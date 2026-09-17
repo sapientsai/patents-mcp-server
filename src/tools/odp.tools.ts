@@ -1,6 +1,6 @@
 import { pathToFileURL } from "node:url"
 
-import type { FastMCP } from "fastmcp"
+import type { ContentResult, FastMCP } from "fastmcp"
 import { z } from "zod"
 
 import { OdpClient } from "../clients/odp.client"
@@ -43,6 +43,15 @@ const createClient = (): OdpClient => {
  * honest handle. The design intent is unchanged either way: the bytes stay out of the model's
  * context and the caller fetches on demand.
  *
+ * The result carries two content items describing the same PDF.
+ *
+ * A `resource_link` is the protocol-native handle: the client reads the bytes back over the MCP
+ * connection it already has, so nothing depends on the server knowing its own public hostname.
+ * Alongside it is the text handle — a url under httpStream, a local path under stdio — because a
+ * client that ignores resource links does not error, it simply ends up with no document, and a
+ * silent empty hand is the failure mode worth designing against. Clients that follow the link get
+ * the clean path; the rest are no worse off than before.
+ *
  * Exported for testing.
  */
 export const buildDownloadResult = async (
@@ -52,28 +61,42 @@ export const buildDownloadResult = async (
   store: FileStore = resourceStore,
   baseUrl: string = config.publicBaseUrl,
   transport: TransportType = config.transport,
-): Promise<string> => {
+): Promise<ContentResult> => {
   const { data } = await client.downloadDocument(applicationNumberText, documentIdentifier)
   const { id } = store.put(Buffer.from(data), "pdf")
 
-  if (transport === "httpStream") {
-    return JSON.stringify({
-      url: `${baseUrl}/resources/${id}.pdf`,
-      mimeType: "application/pdf",
-      expiresInSeconds: store.ttlSeconds,
-    })
-  }
+  const handle =
+    transport === "httpStream"
+      ? {
+          url: `${baseUrl}/resources/${id}.pdf`,
+          mimeType: "application/pdf",
+          expiresInSeconds: store.ttlSeconds,
+        }
+      : (() => {
+          const path = store.getPath(id)
+          return {
+            path,
+            url: path === null ? null : pathToFileURL(path).href,
+            mimeType: "application/pdf",
+            expiresInSeconds: store.ttlSeconds,
+            note:
+              "This server is running over stdio, so it serves no HTTP and the file is on the same " +
+              "machine as you: read it from `path`. It is deleted after expiresInSeconds.",
+          }
+        })()
 
-  const path = store.getPath(id)
-  return JSON.stringify({
-    path,
-    url: path === null ? null : pathToFileURL(path).href,
-    mimeType: "application/pdf",
-    expiresInSeconds: store.ttlSeconds,
-    note:
-      "This server is running over stdio, so it serves no HTTP and the file is on the same machine " +
-      "as you: read it from `path`. It is deleted after expiresInSeconds.",
-  })
+  return {
+    content: [
+      { type: "text", text: JSON.stringify({ ...handle, resourceUri: `patents://document/${id}` }) },
+      {
+        type: "resource_link",
+        uri: `patents://document/${id}`,
+        name: `${applicationNumberText}-${documentIdentifier}.pdf`,
+        description: `File-wrapper document ${documentIdentifier} for application ${applicationNumberText}.`,
+        mimeType: "application/pdf",
+      },
+    ],
+  }
 }
 
 export const registerOdpTools = (server: FastMCP): void => {
@@ -303,7 +326,7 @@ export const registerOdpTools = (server: FastMCP): void => {
   server.addTool({
     name: "odp-download-document",
     description:
-      "Retrieve the full text and content of any patent file-wrapper document — specifications, claims, drawings, office actions (rejections), applicant amendments and remarks, interview summaries, examiner search notes, and prior-art reference lists. This is the authoritative way to read what a document actually says: fetch the documentIdentifier from odp-get-documents (downloadOptionBag), and this tool downloads it and returns a handle to the PDF rather than the bytes. Over HTTP that is { url, mimeType, expiresInSeconds } and you fetch the url; over stdio the server serves no HTTP, so it returns { path, url, mimeType, expiresInSeconds, note } where path is a local file on this machine — read it directly. Either way it is deleted after expiresInSeconds. " +
+      "Retrieve the full text and content of any patent file-wrapper document — specifications, claims, drawings, office actions (rejections), applicant amendments and remarks, interview summaries, examiner search notes, and prior-art reference lists. This is the authoritative way to read what a document actually says: fetch the documentIdentifier from odp-get-documents (downloadOptionBag), and this tool downloads it and returns handles to the PDF rather than the bytes. It returns an MCP resource_link you can read back over this connection, and alongside it a text handle: { url, ... } over HTTP, or { path, ... } over stdio where the file is local to this machine. Use whichever your client supports. The PDF is deleted after expiresInSeconds. " +
       'Use this whenever a question requires the contents of a prosecution document — e.g. "what was the examiner\'s rejection," "how did the applicant respond," "what prior art was cited." It is also the reliable fallback when the structured office-action endpoints (office-action-get-text/-rejections/-citations) are unavailable or return access errors, since those depend on a separate USPTO data tier. ' +
       "Note: older documents are often scanned images with no embedded text layer. The returned PDF is still complete and readable — the consumer should OCR it (rasterize + text-recognize) when direct text extraction yields nothing.",
     parameters: z.object({

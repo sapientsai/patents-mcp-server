@@ -1,4 +1,8 @@
-import type { FastMCP } from "fastmcp"
+import { readFileSync } from "node:fs"
+
+import { type FastMCP, UserError } from "fastmcp"
+
+import { resourceStore, UUID_V4 } from "./store"
 
 const STATUS_CODES: Record<string, string> = {
   "30": "Docketed New Case - Ready for Examination",
@@ -110,6 +114,34 @@ Standard SQL against patents-public-data.patents.publications:
 - Publication number in DOCDB format: US-7650331-B1`
 
 export const registerResources = (server: FastMCP): void => {
+  /**
+   * The transient PDFs `odp-download-document` writes, addressable over MCP itself.
+   *
+   * This is what lets that tool hand back a `resource_link`: the client reads the bytes back
+   * through the connection it already has, so nothing depends on the server knowing its own
+   * public hostname. Same guard as the HTTP route — a strict v4 UUID is validated before any
+   * filesystem access, so `id` is never interpolated into a path unchecked.
+   */
+  server.addResourceTemplate({
+    uriTemplate: "patents://document/{id}",
+    name: "Downloaded patent document",
+    description: "A file-wrapper PDF fetched by odp-download-document. Expires after RESOURCE_TTL_SECONDS.",
+    mimeType: "application/pdf",
+    arguments: [
+      {
+        name: "id",
+        description: "The resource id returned by odp-download-document",
+        required: true,
+      },
+    ],
+    load: async ({ id }) => {
+      if (!UUID_V4.test(id)) throw new UserError("Not a valid document id.")
+      const path = resourceStore.getPath(id)
+      if (path === null) throw new UserError("That document is not available; it may have expired.")
+      return { blob: readFileSync(path).toString("base64"), mimeType: "application/pdf" }
+    },
+  })
+
   server.addResourceTemplate({
     uriTemplate: "patents://cpc/{code}",
     name: "CPC Classification",

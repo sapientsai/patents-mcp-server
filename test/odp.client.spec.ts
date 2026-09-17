@@ -2,6 +2,13 @@ import { describe, expect, it } from "vitest"
 
 import { DEFAULT_SEARCH_FIELDS, OdpClient } from "../src/clients/odp.client"
 
+// Pure, so it runs in CI where no credentials are present — unlike everything below it.
+describe("DEFAULT_SEARCH_FIELDS", () => {
+  it("always projects the application number", () => {
+    expect(DEFAULT_SEARCH_FIELDS).toContain("applicationNumberText")
+  })
+})
+
 const apiKey = process.env.USPTO_API_KEY
 
 describe.skipIf(!apiKey)("OdpClient (integration)", () => {
@@ -56,10 +63,6 @@ describe.skipIf(!apiKey)("OdpClient (integration)", () => {
       for (const w of wrappers(result)) {
         expect(w.applicationNumberText).toBeDefined()
       }
-    })
-
-    it("always projects the application number by default", () => {
-      expect(DEFAULT_SEARCH_FIELDS).toContain("applicationNumberText")
     })
   })
 

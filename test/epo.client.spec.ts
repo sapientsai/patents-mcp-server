@@ -1,13 +1,25 @@
 import { describe, expect, it } from "vitest"
 
-import { detectNumberFormat, epoGetClaims, epoLegalStatus, epoNumberConvert } from "../src/clients/epo-ops.client"
+import {
+  detectNumberFormat,
+  epoGetBiblio,
+  epoGetClaims,
+  epoLegalStatus,
+  epoNumberConvert,
+} from "../src/clients/epo-ops.client"
 
 describe("detectNumberFormat", () => {
+  // The kind code decides, because the two OPS segments have opposite tolerances: epodoc 404s on
+  // a trailing kind code, docdb 413s on a bare number for single-document constituents.
   it.each([
-    ["EP.1000000.A1", "docdb"],
+    ["EP.1000000.A1", "docdb"], // canonical dotted
     ["US.7650331.B1", "docdb"],
-    ["EP1000000", "epodoc"],
-    ["US7650331B1", "epodoc"],
+    ["US7650331B1", "docdb"], // undotted but kind-suffixed — epodoc/US7650331B1 is a 404
+    ["US2020123456A1", "docdb"],
+    ["EP1000000A1", "docdb"],
+    ["us7650331b1", "docdb"], // classification is case-insensitive
+    ["EP1000000", "epodoc"], // bare, no kind code
+    ["US7650331", "epodoc"],
     ["WO2020123456", "epodoc"],
     ["EP 1000000", "epodoc"], // whitespace is stripped before matching
   ])("reads %s as %s", (number, expected) => {
@@ -39,6 +51,19 @@ describe.skipIf(!hasCreds)("EPO OPS (integration)", () => {
       )
       expect(countries.size).toBeGreaterThan(1)
     }, 30000)
+  })
+
+  describe("epoGetBiblio", () => {
+    // US7650331B1 is the example in epo-get-biblio's own description. Inferring epodoc for it
+    // routed to a 404; the kind code makes it docdb.
+    it.each(["US7650331B1", "EP1000000", "EP.1000000.A1"])(
+      "resolves %s with no explicit format",
+      async (number) => {
+        const result = (await epoGetBiblio(number)) as Record<string, any>
+        expect(result["world-patent-data"]?.["exchange-documents"]).toBeDefined()
+      },
+      30000,
+    )
   })
 
   describe("epoGetClaims", () => {

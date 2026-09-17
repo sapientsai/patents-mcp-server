@@ -17,9 +17,9 @@ const numberFormatSchema = z
   .enum(["docdb", "epodoc", "original"])
   .optional()
   .describe(
-    "Patent number format: docdb (EP.1000000.A1), epodoc (EP1000000), or original. Omit this — " +
-      "the format is inferred from the number's shape. OPS cannot convert between formats, and a " +
-      "format that contradicts the number returns a misleading error rather than a clear one.",
+    "Patent number format: docdb (EP.1000000.A1 or US7650331B1), epodoc (EP1000000), or " +
+      "original. Omit this — it is inferred from whether the number carries a kind code, which is " +
+      "what OPS actually requires. Set it only to override that inference.",
   )
 
 const readOnlyAnnotations = {

@@ -58,6 +58,9 @@ const getAccessToken = async (): Promise<string> => {
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: "grant_type=client_credentials",
+    // check-api-status probes this endpoint, so an unbounded wait here stalls the whole status
+    // report. Matches the ODP probe's timeout in utility.tools.ts.
+    signal: AbortSignal.timeout(config.requestTimeout),
   })
 
   if (!response.ok) {
@@ -126,25 +129,35 @@ const epoRequest = async <T>(path: string, accept = "application/xml"): Promise<
   })
 }
 
-/** docdb publication numbers are dotted triples — `EP.1000000.A1`. epodoc numbers are not. */
-const DOCDB_SHAPE = /^[A-Z]{2}\.[^.]+\.[^.]+$/
+/** Canonical docdb form: a dotted triple, `EP.1000000.A1`. */
+const DOCDB_DOTTED = /^[A-Z]{2}\.[^.]+\.[^.]+$/i
+/** docdb also accepts the undotted run-together form carrying a kind code, `US7650331B1`. */
+const DOCDB_KIND_SUFFIXED = /^[A-Z]{2}\d+[A-Z]\d?$/i
 
 /**
  * Infers which OPS number format a string is written in.
  *
- * OPS cannot convert between formats on your behalf: the format segment in the URL must match
- * the shape of the number beside it, or it answers with a misleading error — a docdb path
- * carrying an epodoc number returns HTTP 413, not a 404.
+ * The two segments have opposite tolerances, so the kind code decides:
+ *   - `epodoc` rejects a trailing kind code — `epodoc/US7650331B1` is a 404.
+ *   - `docdb` accepts a kind code dotted or not, but cannot resolve a number without one for
+ *     single-document constituents: `docdb/EP1000000/claims` is a 413 ("ambiguous", since
+ *     EP1000000 matches both A1 and B1), while `epodoc/EP1000000/claims` is a 200.
+ *
+ * So: a number carrying a kind code is docdb, and a bare one is epodoc. The number itself is
+ * passed through as written — OPS needs no reshaping, and inventing one would only add a parse
+ * that can be wrong.
  */
-export const detectNumberFormat = (number: string): EpoNumberFormat =>
-  DOCDB_SHAPE.test(number.replace(/\s+/g, "").replace(/[/,]/g, "")) ? "docdb" : "epodoc"
+export const detectNumberFormat = (number: string): EpoNumberFormat => {
+  const cleaned = number.replace(/\s+/g, "").replace(/[/,]/g, "")
+  return DOCDB_DOTTED.test(cleaned) || DOCDB_KIND_SUFFIXED.test(cleaned) ? "docdb" : "epodoc"
+}
 
 /**
  * Pairs a number with the format segment that matches it.
  *
  * `format` is an override for callers who know better; left undefined, the shape decides. The
- * default used to be a hard-coded "docdb" while every documented example (`EP1000000`,
- * `US7650331B1`) is epodoc-shaped, so the common call was always mismatched.
+ * default used to be a hard-coded "docdb", which silently 413s on `/claims` and `/description`
+ * for the bare numbers those tools document.
  */
 const resolveRef = (number: string, format?: EpoNumberFormat): { format: EpoNumberFormat; num: string } => {
   if (format === "original") return { format: "original", num: number }

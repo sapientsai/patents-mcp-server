@@ -10,6 +10,7 @@ import {
   epoFamilyLookup,
   extractKinds,
   projectFamily,
+  projectLegalStatus,
   projectSearchResults,
 } from "../src/clients/epo-ops.client"
 
@@ -198,29 +199,97 @@ describe("projectFamily", () => {
   })
 })
 
+// Pure, so CI runs it without credentials.
+describe("projectLegalStatus", () => {
+  const event = (code: string, refCountry?: string, effective?: number) => ({
+    "@_code": code,
+    "@_desc": `${code} DESCRIPTION`,
+    "@_infl": "-",
+    // A placeholder, not a date. The real values sit one level down.
+    "@_dateMigr": "00010101",
+    L001EP: { "#text": "EP", "@_desc": "Country Code" },
+    L007EP: { "#text": "2003-02-12", "@_desc": "Gazette DATE" },
+    L500EP: {
+      ...(refCountry ? { L501EP: { "#text": refCountry, "@_desc": "Ref Country Code" } } : {}),
+      L510EP: { "#text": "LAPSE BECAUSE OF FAILURE TO SUBMIT A TRANSLATION", "@_desc": "Free Format Text" },
+      ...(effective ? { L525EP: { "#text": effective, "@_desc": "Effective DATE" } } : {}),
+    },
+  })
+
+  const response = {
+    "world-patent-data": {
+      "patent-family": {
+        "@_total-result-count": "1",
+        "@_legal": "true",
+        "family-member": [
+          {
+            "publication-reference": {
+              "document-id": [
+                { country: "EP", "doc-number": 1000000, kind: "A1", "@_document-id-type": "docdb" },
+                { "doc-number": "EP1000000", "@_document-id-type": "epodoc" },
+              ],
+            },
+            legal: [event("PG25", "CH", 20030212), event("PG25", "DE", 20030513), event("17Q", undefined, 20020423)],
+          },
+        ],
+      },
+    },
+  }
+
+  it("attributes each event to the state it applies to, not the publishing office", () => {
+    // L001EP reads "EP" on every PG25; taking it would collapse distinct national lapses into one.
+    const { members } = projectLegalStatus(response)
+    expect(members[0].events.filter((e) => e.code === "PG25").map((e) => e.country)).toEqual(["CH", "DE"])
+  })
+
+  it("falls back to the publishing office when no ref country is given", () => {
+    expect(projectLegalStatus(response).members[0].events[2].country).toBe("EP")
+  })
+
+  it("lists every jurisdiction touched, including event-level states", () => {
+    // CH and DE appear nowhere in the member list — only on the events.
+    expect(projectLegalStatus(response).jurisdictions).toEqual(["CH", "DE", "EP"])
+  })
+
+  it("normalises both date spellings OPS uses", () => {
+    const first = projectLegalStatus(response).members[0].events[0]
+    expect(first.effectiveDate).toBe("2003-02-12") // from compact 20030212
+    expect(first.gazetteDate).toBe("2003-02-12") // already hyphenated
+  })
+
+  it("never surfaces the dateMigr placeholder", () => {
+    const json = JSON.stringify(projectLegalStatus(response))
+    expect(json).not.toContain("0001-01-01")
+    expect(json).not.toContain("00010101")
+  })
+
+  it("counts events across members", () => {
+    expect(projectLegalStatus(response).eventCount).toBe(3)
+  })
+
+  it("returns an empty result rather than throwing on a malformed response", () => {
+    expect(projectLegalStatus({})).toMatchObject({ total: 0, eventCount: 0, members: [] })
+  })
+})
+
 const hasCreds = !!(process.env.EPO_CONSUMER_KEY && process.env.EPO_CONSUMER_SECRET)
 
 describe.skipIf(!hasCreds)("EPO OPS (integration)", () => {
   describe("epoLegalStatus", () => {
-    it("returns legal events, not bibliographic data", async () => {
-      // The defect: `published-data/.../legal` is an unsupported constituent that OPS answers
-      // with HTTP 200 and the biblio payload, so this tool returned plausible, wrong data.
-      const result = (await epoLegalStatus("EP1000000")) as Record<string, any>
-      const family = result["world-patent-data"]?.["patent-family"]
-      expect(family).toBeDefined()
+    it("returns dated legal events per member, not bibliographic data", async () => {
+      // `published-data/.../legal` is not a supported constituent: OPS answers it with HTTP 200
+      // and the biblio payload, so this tool used to return plausible, wrong data.
+      const status = await epoLegalStatus("EP1000000")
+      expect(status.eventCount).toBeGreaterThan(0)
+      expect(status.jurisdictions.length).toBeGreaterThan(1)
 
-      const members = family["family-member"]
-      expect(Array.isArray(members)).toBe(true)
+      const events = status.members.flatMap((m) => m.events)
+      expect(events.some((e) => e.effectiveDate !== undefined)).toBe(true)
+      expect(JSON.stringify(status)).not.toContain("0001-01-01")
 
-      const withLegal = members.filter((m: Record<string, unknown>) => m.legal !== undefined)
-      expect(withLegal.length).toBeGreaterThan(0)
-      // The old path returned an `exchange-documents` biblio payload; that marker must be gone.
-      expect(result["world-patent-data"]?.["exchange-documents"]).toBeUndefined()
-      // Jurisdiction spread is the whole point of the tool.
-      const countries = new Set(
-        members.map((m: any) => m["publication-reference"]?.["document-id"]?.[0]?.country).filter(Boolean),
-      )
-      expect(countries.size).toBeGreaterThan(1)
+      // A single EP lapse fans out across contracting states, each with its own date.
+      const lapses = events.filter((e) => e.code === "PG25")
+      expect(new Set(lapses.map((e) => e.country)).size).toBeGreaterThan(1)
     }, 30000)
   })
 

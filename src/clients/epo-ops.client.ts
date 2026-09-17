@@ -497,9 +497,116 @@ export const epoFamilyLookup = async (number: string, format?: EpoNumberFormat):
   return projectFamily(await epoRequest(`family/publication/${fmt}/${num}/biblio`))
 }
 
-export const epoLegalStatus = async (number: string, format?: EpoNumberFormat): Promise<unknown> => {
+export type EpoLegalEvent = {
+  code: string
+  description?: string
+  /** The jurisdiction the event applies to — a single EP lapse fans out across member states. */
+  country?: string
+  /** Free-format detail, e.g. why a lapse occurred. */
+  detail?: string
+  /** When the event took effect. */
+  effectiveDate?: string
+  /** When it was published in the gazette. */
+  gazetteDate?: string
+  /** OPS marks each event `+` or `-` for whether it favours the patent. Passed through as given. */
+  influence?: string
+}
+
+export type EpoLegalStatusMember = {
+  country?: string
+  publicationNumber: string
+  kind?: string
+  events: EpoLegalEvent[]
+}
+
+export type EpoLegalStatus = {
+  total: number
+  eventCount: number
+  jurisdictions: string[]
+  members: EpoLegalStatusMember[]
+}
+
+/** OPS mixes `2002-06-05` and `20020423` across date fields; normalise both to ISO. */
+const normalizeDate = (value: unknown): string | undefined => {
+  const text = asText(value)
+  if (text === undefined) return undefined
+  const compact = /^(\d{4})(\d{2})(\d{2})$/.exec(text)
+  if (compact) return `${compact[1]}-${compact[2]}-${compact[3]}`
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : undefined
+}
+
+/** Field values arrive as `{ "#text": ..., "@_desc": ... }` wrappers. */
+const fieldText = (node: Node | undefined, key: string): unknown => at(asNode(at(node, key)), "#text")
+
+/**
+ * Reduces an INPADOC legal-status response to dated events per family member.
+ *
+ * Two traps this removes. The raw response runs ~74KB for six members, and every event carries
+ * `@_dateMigr="00010101"` — a placeholder, not a date, while the real values sit one level down
+ * in `L007EP` (gazette) and `L500EP/L525EP` (effective). Reading the obvious top-level field
+ * yields year 1 for every event.
+ *
+ * Exported for testing.
+ */
+export const projectLegalStatus = (parsed: unknown): EpoLegalStatus => {
+  const family = asNode(at(asNode(at(asNode(parsed), "world-patent-data")), "patent-family"))
+  const total = Number(asText(at(family, "@_total-result-count")) ?? 0)
+
+  const members: EpoLegalStatusMember[] = asNodes(at(family, "family-member")).map((member) => {
+    const ids = asNodes(at(asNode(at(member, "publication-reference")), "document-id"))
+    const docdb = ids.find((d) => d["@_document-id-type"] === "docdb")
+    const epodoc = ids.find((d) => d["@_document-id-type"] === "epodoc")
+
+    const events: EpoLegalEvent[] = asNodes(at(member, "legal")).map((event) => {
+      const detailBlock = asNode(at(event, "L500EP"))
+      return {
+        code: asText(at(event, "@_code")) ?? "",
+        description: asText(at(event, "@_desc")),
+        // L501EP ("Ref Country Code") is the state the event applies to; L001EP is the office
+        // that published it. For a PG25 lapse those differ on every record — the office reads
+        // "EP" while the patent actually lapsed in CH, DE, FR and sixteen others, so taking
+        // L001EP would collapse nineteen distinct national lapses into one meaningless "EP".
+        country: asText(fieldText(detailBlock, "L501EP")) ?? asText(fieldText(event, "L001EP")),
+        detail: asText(fieldText(detailBlock, "L510EP")),
+        effectiveDate: normalizeDate(fieldText(detailBlock, "L525EP")),
+        gazetteDate: normalizeDate(fieldText(event, "L007EP")),
+        influence: asText(at(event, "@_infl")),
+      }
+    })
+
+    return {
+      country: asText(at(docdb, "country")),
+      publicationNumber:
+        asText(at(epodoc, "doc-number")) ??
+        `${asText(at(docdb, "country")) ?? ""}${asText(at(docdb, "doc-number")) ?? ""}`,
+      kind: asText(at(docdb, "kind")),
+      events,
+    }
+  })
+
+  // Event-level countries matter more than member-level ones here: a single EP event lapses
+  // across many contracting states, and those states appear nowhere in the member list.
+  const jurisdictions = [
+    ...new Set(members.flatMap((m) => [m.country, ...m.events.map((e) => e.country)]).filter((c): c is string => !!c)),
+  ].sort()
+
+  return {
+    total,
+    eventCount: members.reduce((n, m) => n + m.events.length, 0),
+    jurisdictions,
+    members,
+  }
+}
+
+/**
+ * Worldwide legal status, as dated events per family member.
+ *
+ * Uses the family `legal` constituent — `published-data/.../legal` is not a supported
+ * constituent and OPS answers it with HTTP 200 and the biblio payload instead.
+ */
+export const epoLegalStatus = async (number: string, format?: EpoNumberFormat): Promise<EpoLegalStatus> => {
   const { format: fmt, num } = resolveRef(number, format)
-  return epoRequest(`family/publication/${fmt}/${num}/legal`)
+  return projectLegalStatus(await epoRequest(`family/publication/${fmt}/${num}/legal`))
 }
 
 /** What an OPS number refers to. The number service requires this segment in the path. */

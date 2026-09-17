@@ -163,9 +163,14 @@ freedom-to-operate or due diligence.`,
 
   server.addTool({
     name: "epo-legal-status",
-    description: `Get worldwide legal status events for a patent from EPO OPS.
-Shows legal status across ~44 patent offices: granted, lapsed, opposed, withdrawn, etc.
-Critical for determining if a patent is still in force in specific jurisdictions.`,
+    description: `Get worldwide legal status events for a patent, per INPADOC family member.
+Returns grant, lapse, opposition and fee events, each with the jurisdiction it applies to and
+its effective date.
+
+A single EP event fans out across contracting states — one lapse becomes nineteen national
+records with their own countries and dates — so \`jurisdictions\` lists every state touched, not
+just the family members. This is the tool for whether a patent is still in force somewhere;
+epo-family-lookup only says where protection was sought.`,
     parameters: z.object({
       number: z.string().describe("Patent number"),
       format: numberFormatSchema,

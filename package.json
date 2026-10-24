@@ -2,6 +2,7 @@
   "name": "patents-mcp-server",
   "version": "1.2.2",
   "description": "FastMCP TypeScript patent intelligence MCP server — 55 tools across USPTO, EPO, and BigQuery",
+  "mcpName": "io.github.sapientsai/patents-mcp-server",
   "keywords": [
     "mcp",
     "patents",
@@ -31,7 +32,10 @@
     "dev": "ts-builds dev",
     "codegen": "openapi-ts",
     "fetch-specs": "gh api repos/patent-dev/uspto-odp/contents/swagger_fixed.yaml --jq '.content' | base64 -d > src/specs/uspto-odp.yaml",
-    "prepublishOnly": "pnpm validate"
+    "prepublishOnly": "pnpm validate && pnpm check:server-json",
+    "sync:server-json": "node scripts/sync-server-json.mjs",
+    "check:server-json": "node scripts/sync-server-json.mjs --check",
+    "version": "node scripts/sync-server-json.mjs && git add server.json"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "^0.94.5",

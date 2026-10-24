@@ -1,0 +1,85 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.sapientsai/patents-mcp-server",
+  "description": "Patent intelligence \u2014 55 tools over USPTO, PatentsView, EPO OPS and BigQuery full text.",
+  "repository": {
+    "url": "https://github.com/sapientsai/patents-mcp-server",
+    "source": "github"
+  },
+  "version": "1.2.2",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "patents-mcp-server",
+      "version": "1.2.2",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "USPTO_API_KEY",
+          "description": "USPTO Open Data Portal key (data.uspto.gov) \u2014 enables ODP, PTAB, citations and office actions",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "PATENTSVIEW_API_KEY",
+          "description": "PatentsView key (patentsview.org/apis/keyrequest) \u2014 enables patent search, assignees, inventors and attorneys",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "EPO_CONSUMER_KEY",
+          "description": "EPO OPS consumer key (developers.epo.org) \u2014 enables international patent families and legal status",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "EPO_CONSUMER_SECRET",
+          "description": "EPO OPS consumer secret",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "GOOGLE_APPLICATION_CREDENTIALS",
+          "description": "Path to a GCP service-account key with bigquery.jobUser and bigquery.dataViewer \u2014 enables full-text search across 90M+ patents",
+          "isRequired": false,
+          "format": "filepath",
+          "isSecret": false
+        },
+        {
+          "name": "GOOGLE_CLOUD_PROJECT",
+          "description": "GCP project ID billed for the BigQuery queries",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "TRANSPORT",
+          "description": "Transport: 'stdio' (default) or 'httpStream' for remote/Docker deployments",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "PORT",
+          "description": "Port to listen on when TRANSPORT is httpStream (default 8080)",
+          "isRequired": false,
+          "format": "number",
+          "isSecret": false
+        },
+        {
+          "name": "LOG_LEVEL",
+          "description": "Log verbosity: DEBUG, INFO (default), WARN or ERROR",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

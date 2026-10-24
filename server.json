@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.sapientsai/patents-mcp-server",
-  "description": "Patent intelligence \u2014 55 tools over USPTO, PatentsView, EPO OPS and BigQuery full text.",
+  "description": "Patent intelligence — USPTO Open Data, PTAB, EPO OPS and BigQuery full-text search.",
   "repository": {
     "url": "https://github.com/sapientsai/patents-mcp-server",
     "source": "github"
@@ -18,21 +18,14 @@
       "environmentVariables": [
         {
           "name": "USPTO_API_KEY",
-          "description": "USPTO Open Data Portal key (data.uspto.gov) \u2014 enables ODP, PTAB, citations and office actions",
-          "isRequired": false,
-          "format": "string",
-          "isSecret": true
-        },
-        {
-          "name": "PATENTSVIEW_API_KEY",
-          "description": "PatentsView key (patentsview.org/apis/keyrequest) \u2014 enables patent search, assignees, inventors and attorneys",
+          "description": "USPTO Open Data Portal key (data.uspto.gov) — enables ODP, PTAB, citations and office actions",
           "isRequired": false,
           "format": "string",
           "isSecret": true
         },
         {
           "name": "EPO_CONSUMER_KEY",
-          "description": "EPO OPS consumer key (developers.epo.org) \u2014 enables international patent families and legal status",
+          "description": "EPO OPS consumer key (developers.epo.org) — enables international patent families and legal status",
           "isRequired": false,
           "format": "string",
           "isSecret": true
@@ -46,10 +39,17 @@
         },
         {
           "name": "GOOGLE_APPLICATION_CREDENTIALS",
-          "description": "Path to a GCP service-account key with bigquery.jobUser and bigquery.dataViewer \u2014 enables full-text search across 90M+ patents",
+          "description": "Path to a GCP service-account key with bigquery.jobUser and bigquery.dataViewer — enables full-text search across 90M+ patents",
           "isRequired": false,
           "format": "filepath",
           "isSecret": false
+        },
+        {
+          "name": "GOOGLE_CREDENTIALS_JSON",
+          "description": "GCP service-account key as inline JSON — the alternative to GOOGLE_APPLICATION_CREDENTIALS when no file can be mounted",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
         },
         {
           "name": "GOOGLE_CLOUD_PROJECT",
@@ -75,6 +75,20 @@
         {
           "name": "LOG_LEVEL",
           "description": "Log verbosity: DEBUG, INFO (default), WARN or ERROR",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "HOST",
+          "description": "Interface to bind when TRANSPORT is httpStream (default 0.0.0.0)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "PUBLIC_BASE_URL",
+          "description": "Base URL used to build the /resources/{id}.pdf links that odp-download-document returns",
           "isRequired": false,
           "format": "string",
           "isSecret": false

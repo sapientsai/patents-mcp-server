@@ -42,3 +42,6 @@ node_modules/
 
 # Claude Code
 .claude/settings.local.json
+
+# MCP Registry publisher binary, downloaded by CI
+mcp-publisher

@@ -11,7 +11,7 @@
     "epo",
     "patent-search"
   ],
-  "author": "jordan.burke@gmail.com",
+  "author": "Jordan Burke <jordan.burke@gmail.com>",
   "license": "MIT",
   "homepage": "https://github.com/sapientsai/patents-mcp-server",
   "repository": {

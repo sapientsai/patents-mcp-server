@@ -23,6 +23,7 @@ on:
 jobs:
   publish-registry:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       id-token: write # OIDC — proves this repo belongs to the sapientsai org

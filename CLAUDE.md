@@ -12,6 +12,7 @@ Ported from Python `riemannzeta/patent_mcp_server` (51 tools) with EPO OPS and B
 
 ```bash
 pnpm validate        # Main command: format + lint + test + build (use before commits)
+pnpm run ci          # validate's checks without fixing, as CI runs them (type `run`: `pnpm ci` is a clean install)
 pnpm format          # Format code with Prettier
 pnpm lint            # Fix ESLint issues
 pnpm test            # Run tests once

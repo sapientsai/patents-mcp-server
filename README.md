@@ -170,6 +170,7 @@ Six workflow prompt templates for common patent analysis tasks:
 
 ```bash
 pnpm validate        # Format + lint + typecheck + test + build
+pnpm run ci          # validate's checks without fixing, as CI runs them (type `run`: `pnpm ci` is a clean install)
 pnpm test            # Run tests
 pnpm build           # Production build
 pnpm typecheck       # Type check only
